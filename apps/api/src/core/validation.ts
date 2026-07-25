@@ -1,0 +1,6 @@
+import { ValidationError } from '@gtstore/domain/errors';
+export function requiredString(value:unknown,field:string,max=500):string { if(typeof value!=='string'||!value.trim()) throw new ValidationError(`${field} is required`); const out=value.trim(); if(out.length>max) throw new ValidationError(`${field} is too long`); return out; }
+export function optionalString(value:unknown,field:string,max=500):string|undefined { if(value===undefined||value===null||value==='') return undefined; return requiredString(value,field,max); }
+export function positiveNumber(value:unknown,field:string,allowZero=true):number { const n=Number(value); if(!Number.isFinite(n)||(allowZero?n<0:n<=0)) throw new ValidationError(`${field} must be ${allowZero?'non-negative':'positive'}`); return n; }
+export function booleanValue(value:unknown,defaultValue=false):boolean { if(value===undefined) return defaultValue; if(typeof value==='boolean') return value; if(value==='true'||value===1||value==='1') return true; if(value==='false'||value===0||value==='0') return false; throw new ValidationError('Invalid boolean'); }
+export function enumValue<T extends string>(value:unknown,allowed:readonly T[],field:string):T { if(typeof value!=='string'||!allowed.includes(value as T)) throw new ValidationError(`${field} has invalid value`); return value as T; }

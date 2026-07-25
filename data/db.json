@@ -1,0 +1,97 @@
+{
+  "shops": [
+    {
+      "id": "demo",
+      "name": "GtTobacco",
+      "slug": "gttobacco",
+      "description": "Каталог GtTobacco",
+      "author": "Кирилл Романович",
+      "active": true,
+      "botUsername": "",
+      "botToken": "",
+      "telegram": {
+        "welcome": "Добро пожаловать в GtTobacco",
+        "orderNotifications": true,
+        "statusNotifications": true,
+        "webAppButton": "Открыть магазин"
+      },
+      "createdAt": "2026-07-25T00:00:00.000Z"
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-devices",
+      "shopId": "demo",
+      "name": "Устройства",
+      "sort": 10,
+      "active": true
+    },
+    {
+      "id": "cat-liquids",
+      "shopId": "demo",
+      "name": "Жидкости",
+      "sort": 20,
+      "active": true
+    }
+  ],
+  "products": [],
+  "orders": [],
+  "events": [],
+  "members": [
+    {
+      "id": "member-owner",
+      "name": "Кирилл Романович",
+      "email": "owner@gtstore.local",
+      "role": "owner",
+      "active": true,
+      "createdAt": "2026-07-25T00:00:00.000Z"
+    }
+  ],
+  "apiKeys": [],
+  "webhooks": [],
+  "auth": {
+    "email": "kirill@gtstore.app",
+    "password": "gtstore2026",
+    "name": "Кирилл Романович",
+    "role": "owner"
+  },
+  "billing": {
+    "plan": "pro",
+    "status": "trial",
+    "trialEndsAt": "2026-08-08T00:00:00.000Z",
+    "nextPaymentAt": "2026-08-08T00:00:00.000Z",
+    "monthlyPrice": 2999,
+    "currency": "RUB",
+    "paymentMethod": "•••• 4242",
+    "invoices": [
+      {
+        "id": "inv-demo",
+        "date": "2026-07-25T00:00:00.000Z",
+        "amount": 0,
+        "status": "trial",
+        "description": "Пробный период GtStore Pro"
+      }
+    ],
+    "billingPeriod": "month"
+  },
+  "audit": [
+    {
+      "id": "audit-79d85071-ac83-486d-ab28-b1ce33c5e75d",
+      "actor": "kirill@gtstore.app",
+      "role": "owner",
+      "action": "auth.login",
+      "details": {},
+      "createdAt": "2026-07-25T02:31:41.989Z"
+    },
+    {
+      "id": "audit-3adda58e-2746-4a39-9460-0bdbb01adf2f",
+      "actor": "kirill@gtstore.app",
+      "role": "owner",
+      "action": "auth.login",
+      "details": {},
+      "createdAt": "2026-07-25T02:42:50.154Z"
+    }
+  ],
+  "telegramBots": [],
+  "telegramLogs": []
+}

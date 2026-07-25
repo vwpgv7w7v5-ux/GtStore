@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { createApp } from '../../apps/api-v6/src/app.js';
+const file=path.join(os.tmpdir(),`gtstore-catalog-${Date.now()}.json`);const {server}=createApp({databaseFile:file});await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}/api/v6`;
+const request=async(path,options={})=>{const response=await fetch(base+path,{...options,headers:{'content-type':'application/json',...(options.token?{authorization:`Bearer ${options.token}`}:{})},body:options.body?JSON.stringify(options.body):undefined});const data=response.status===204?null:await response.json();return{response,data}};
+await request('/bootstrap',{method:'POST',body:{email:'owner@test.local',password:'StrongPass123!',name:'Owner'}});const login=await request('/auth/login',{method:'POST',body:{email:'owner@test.local',password:'StrongPass123!'}});const token=login.data.token;const me=(await request('/me',{token})).data;const ws=me.workspaces[0];const shops=(await request(`/workspaces/${ws.id}/shops`,{token})).data;const shop=shops[0];const root=`/workspaces/${ws.id}/shops/${shop.id}`;
+const parent=(await request(root+'/categories',{method:'POST',token,body:{name:'Электроника'}})).data;const child=(await request(root+'/categories',{method:'POST',token,body:{name:'Наушники',parentId:parent.id}})).data;assert.equal((await request(root+'/categories?tree=1',{token})).data[0].children[0].id,child.id);
+const product=(await request(root+'/products',{method:'POST',token,body:{name:'Air Sound',sku:'AIR-001',categoryId:child.id,price:2990,stock:3,images:[{url:'https://example.com/a.jpg'}],variants:[{name:'Black',sku:'AIR-BLK',price:2990,stock:4},{name:'White',sku:'AIR-WHT',price:3190,stock:2}]}})).data;assert.equal(product.variants.length,2);assert.equal((await request(root+'/products',{token})).data[0].totalStock,6);
+await request(root+'/products/bulk',{method:'POST',token,body:{ids:[product.id],active:false}});assert.equal((await request(root+'/products?status=hidden',{token})).data.length,1);
+const preview=(await request(root+'/import/preview',{method:'POST',token,body:{rows:[{'Название':'Товар','SKU':'SKU-2','Цена':100}]}})).data;assert.equal(preview.valid,true);
+await request(root+`/products/${product.id}`,{method:'DELETE',token});assert.equal((await request(root+'/products',{token})).data.length,0);
+server.close();fs.rmSync(file,{force:true});console.log('V6.1 catalog engine tests passed');

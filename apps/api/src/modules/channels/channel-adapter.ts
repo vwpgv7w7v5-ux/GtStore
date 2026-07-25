@@ -1,0 +1,3 @@
+export interface ChannelUser {channel:'telegram'|'max'|'web';externalId:string;username?:string;firstName?:string;lastName?:string;locale?:string;}
+export interface ChannelMessage {text:string;imageUrl?:string;buttons?:Array<{label:string;url?:string;callbackData?:string}>;}
+export interface ChannelAdapter {readonly type:string;connect(credentials:Record<string,string>):Promise<{ok:boolean;accountName?:string}>;verifyWebhook(headers:Record<string,string|undefined>,body:unknown):boolean;normalizeUser(payload:unknown):ChannelUser|undefined;sendMessage(externalUserId:string,message:ChannelMessage):Promise<{messageId:string}>;publishStorefront(url:string):Promise<void>;}

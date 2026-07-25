@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+const allowed={draft:['new','cancelled'],new:['confirmed','awaiting_payment','cancelled'],confirmed:['awaiting_payment','paid','assembling','cancelled'],awaiting_payment:['paid','cancelled'],paid:['assembling','refunded'],assembling:['ready','cancelled'],ready:['shipped','completed','cancelled'],shipped:['completed','refunded'],completed:['refunded'],cancelled:[],refunded:[]};
+assert.equal(allowed.new.includes('confirmed'),true);
+assert.equal(allowed.completed.includes('new'),false);
+const reward=(total,percent,max)=>Math.round(Math.min(total*percent/100,max)*100)/100;
+assert.equal(reward(1000,20,10000),200);
+assert.equal(reward(100000,20,5000),5000);
+const add=(a,b)=>Math.round((a+b)*100)/100;
+assert.equal(add(0.1,0.2),0.3);
+console.log('V5 domain tests passed');

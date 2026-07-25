@@ -1,0 +1,41 @@
+/* GtStore Vision UI v3.2 — additive design layer */
+:root{
+  --vision-copper:#d88756;--vision-copper-bright:#ffb27e;--vision-amber:#f3c48b;
+  --vision-ink:#0b0b0c;--vision-graphite:#151416;--vision-panel:rgba(32,29,28,.72);
+  --vision-frost:rgba(255,255,255,.055);--vision-border:rgba(255,190,145,.16);
+  --vision-glow:0 0 0 1px rgba(255,178,126,.08),0 24px 90px rgba(115,53,27,.26);
+  --vision-ease:cubic-bezier(.2,.8,.2,1)
+}
+html{font-feature-settings:"ss01" 1,"cv02" 1,"cv03" 1;text-rendering:optimizeLegibility}
+body.admin-body:before{content:"";position:fixed;inset:-30%;pointer-events:none;z-index:-1;background:conic-gradient(from 190deg at 50% 50%,transparent 0 24%,rgba(216,135,86,.08) 31%,transparent 39% 63%,rgba(243,196,139,.05) 72%,transparent 80%);animation:visionAurora 24s linear infinite;filter:blur(42px)}
+@keyframes visionAurora{to{transform:rotate(1turn) scale(1.08)}}
+@keyframes visionShimmer{0%{background-position:200% 50%}100%{background-position:-200% 50%}}
+@keyframes visionPulse{0%,100%{opacity:.58;transform:scale(.98)}50%{opacity:1;transform:scale(1.03)}}
+.brand b,.auth-brand b,.vision-gradient-text{background:linear-gradient(100deg,#fff 0%,var(--vision-amber) 28%,var(--vision-copper-bright) 52%,#fff 72%,var(--vision-copper) 100%);background-size:240% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:visionShimmer 8s linear infinite}
+.sidebar{border-right:1px solid var(--vision-border);box-shadow:24px 0 90px rgba(0,0,0,.24);backdrop-filter:blur(24px) saturate(130%)}
+.nav button{position:relative;overflow:hidden;transition:transform .25s var(--vision-ease),background .25s,border-color .25s}
+.nav button:before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 10%,rgba(255,255,255,.07) 48%,transparent 75%);transform:translateX(-120%);transition:transform .65s var(--vision-ease)}
+.nav button:hover:before{transform:translateX(120%)}.nav button:hover{transform:translateX(4px)}
+.nav button.active{box-shadow:inset 0 0 0 1px rgba(255,178,126,.18),0 10px 38px rgba(112,54,29,.18)}
+.panel,.card,.modal-card,.shop-card{backdrop-filter:blur(24px) saturate(125%);border-color:var(--vision-border)!important;box-shadow:var(--vision-glow)}
+.panel,.card{position:relative;overflow:hidden}.panel:after,.card:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg,rgba(255,255,255,.035),transparent 35% 70%,rgba(216,135,86,.035))}
+.btn{transition:transform .2s var(--vision-ease),box-shadow .2s,border-color .2s,filter .2s}.btn:hover{transform:translateY(-2px);filter:brightness(1.08)}.btn:active{transform:translateY(0) scale(.985)}
+.btn.primary{background:linear-gradient(112deg,#b9633e,#dc8b5b 38%,#f1b17f 52%,#bb6641 77%);background-size:220% 100%;animation:visionShimmer 9s linear infinite;box-shadow:0 12px 34px rgba(185,99,62,.27)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:rgba(255,178,126,.52)!important;box-shadow:0 0 0 4px rgba(216,135,86,.1),0 10px 35px rgba(0,0,0,.18)}
+.vision-command{position:fixed;inset:0;z-index:9999;display:none;align-items:flex-start;justify-content:center;padding-top:min(16vh,150px);background:rgba(5,5,6,.66);backdrop-filter:blur(16px)}
+.vision-command.open{display:flex}.vision-command-box{width:min(720px,calc(100vw - 28px));border:1px solid var(--vision-border);border-radius:24px;background:rgba(20,18,18,.94);box-shadow:0 34px 120px rgba(0,0,0,.65);overflow:hidden}
+.vision-command-input{width:100%;padding:22px 24px;border:0!important;border-bottom:1px solid var(--vision-border)!important;background:transparent;color:#fff;font-size:20px}
+.vision-command-results{max-height:420px;overflow:auto;padding:10px}.vision-command-item{display:flex;justify-content:space-between;gap:20px;padding:14px 16px;border-radius:14px;color:#ddd}.vision-command-item:hover,.vision-command-item.active{background:rgba(216,135,86,.13);color:#fff}.vision-command-item small{color:#948b85}
+.vision-topbar{position:fixed;right:22px;top:18px;z-index:80;display:flex;gap:8px}.vision-pill{display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--vision-border);border-radius:999px;background:rgba(17,16,16,.76);backdrop-filter:blur(18px);color:#cfc7c0;font-size:12px;box-shadow:0 12px 42px rgba(0,0,0,.2)}.vision-dot{width:7px;height:7px;border-radius:50%;background:#8cc5a4;box-shadow:0 0 16px #8cc5a4;animation:visionPulse 2.4s ease-in-out infinite}
+.vision-onboarding{position:fixed;right:22px;bottom:22px;z-index:80;width:min(360px,calc(100vw - 28px));padding:18px;border:1px solid var(--vision-border);border-radius:20px;background:rgba(19,17,17,.9);backdrop-filter:blur(22px);box-shadow:0 24px 80px rgba(0,0,0,.42);transform:translateY(calc(100% + 40px));transition:transform .5s var(--vision-ease)}.vision-onboarding.open{transform:translateY(0)}.vision-onboarding h3{margin:0 0 6px}.vision-onboarding p{margin:0;color:#9f9690;font-size:13px}.vision-progress{height:7px;background:#282422;border-radius:999px;overflow:hidden;margin:14px 0}.vision-progress>i{display:block;height:100%;background:linear-gradient(90deg,var(--vision-copper),var(--vision-amber));border-radius:inherit}.vision-checks{display:grid;gap:8px}.vision-check{display:flex;gap:10px;align-items:center;font-size:13px}.vision-check.done{color:#8cc5a4}.vision-check b{width:20px;height:20px;display:grid;place-items:center;border:1px solid currentColor;border-radius:50%;font-size:11px}
+.vision-toast-stack{position:fixed;right:22px;top:70px;z-index:10000;display:grid;gap:10px}.vision-toast{min-width:260px;max-width:390px;padding:13px 15px;border:1px solid var(--vision-border);border-radius:14px;background:rgba(25,22,21,.95);box-shadow:0 18px 60px rgba(0,0,0,.4);animation:toastIn .35s var(--vision-ease)}@keyframes toastIn{from{opacity:0;transform:translateY(-12px) scale(.97)}}
+@media(max-width:900px){.vision-topbar{display:none}.vision-onboarding{right:14px;bottom:14px}.panel,.card{backdrop-filter:blur(14px)}}
+@media(prefers-reduced-motion:reduce){body.admin-body:before,.brand b,.auth-brand b,.btn.primary,.vision-dot{animation:none!important}.nav button,.btn,.vision-onboarding{transition:none!important}}
+
+/* v4 production core signal */
+.vision-core-badge{position:fixed;left:18px;bottom:18px;z-index:55;display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid rgba(255,190,120,.24);border-radius:16px;background:linear-gradient(115deg,rgba(20,15,13,.88),rgba(67,37,22,.72),rgba(20,15,13,.88));background-size:220% 220%;box-shadow:0 18px 50px rgba(0,0,0,.35),inset 0 1px rgba(255,255,255,.08);backdrop-filter:blur(22px);animation:visionCoreFlow 8s ease infinite;color:#f9eadc;font:600 12px/1.2 Inter,system-ui,sans-serif;letter-spacing:.04em}
+.vision-core-badge::before{content:'';width:8px;height:8px;border-radius:50%;background:#ffb36a;box-shadow:0 0 0 5px rgba(255,179,106,.1),0 0 20px rgba(255,179,106,.75);animation:visionCorePulse 2.3s ease-in-out infinite}
+.vision-core-badge small{display:block;color:rgba(255,235,215,.56);font-weight:500;letter-spacing:0;margin-top:2px}
+@keyframes visionCoreFlow{0%,100%{background-position:0 50%}50%{background-position:100% 50%}}
+@keyframes visionCorePulse{50%{transform:scale(.72);opacity:.62}}
+@media(max-width:800px){.vision-core-badge{display:none}}

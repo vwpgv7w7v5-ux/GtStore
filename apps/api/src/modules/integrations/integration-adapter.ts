@@ -1,0 +1,3 @@
+export type SyncEntity='products'|'categories'|'stock'|'orders'|'customers'|'deals';
+export interface SyncResult {entity:SyncEntity;read:number;created:number;updated:number;skipped:number;failed:number;cursor?:string;errors:Array<{externalId?:string;code:string;message:string}>;}
+export interface IntegrationAdapter {readonly type:string;testConnection():Promise<{ok:boolean;account?:string;details?:Record<string,unknown>}>;pull(entity:SyncEntity,cursor?:string):Promise<SyncResult>;push(entity:SyncEntity,ids:string[]):Promise<SyncResult>;handleWebhook(payload:unknown,headers:Record<string,string|undefined>):Promise<void>;}

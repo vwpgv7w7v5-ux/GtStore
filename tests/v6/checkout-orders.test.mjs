@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createApp } from '../../apps/api-v6/src/app.js';
+
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'gtstore-v64-'));
+const {server}=createApp({databaseFile:path.join(temp,'db.json'),mediaDirectory:path.join(temp,'media')});
+await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+const base=`http://127.0.0.1:${server.address().port}/api/v6`;
+const request=async(url,options={})=>{const response=await fetch(base+url,{...options,headers:{'content-type':'application/json',...(options.headers||{})},body:options.body?JSON.stringify(options.body):undefined});const body=response.status===204?null:await response.json();if(!response.ok)throw Object.assign(new Error(body?.error?.message||'HTTP error'),{status:response.status,body});return body};
+try{
+  const boot=await request('/bootstrap',{method:'POST',body:{email:'owner@test.local',password:'ChangeMe123!',name:'Owner'}});
+  const login=await request('/auth/login',{method:'POST',body:{email:'owner@test.local',password:'ChangeMe123!'}});
+  const auth={authorization:`Bearer ${login.token}`};
+  const me=await request('/me',{headers:auth});
+  const workspace=me.workspaces[0];
+  const shop=(await request(`/workspaces/${workspace.id}/shops`,{headers:auth}))[0];
+  const category=await request(`/workspaces/${workspace.id}/shops/${shop.id}/categories`,{method:'POST',headers:auth,body:{name:'Тест'}});
+  const product=await request(`/workspaces/${workspace.id}/shops/${shop.id}/products`,{method:'POST',headers:auth,body:{name:'Товар',sku:'SKU-ORDER',categoryId:category.id,price:1000,stock:5,active:true}});
+  await request(`/workspaces/${workspace.id}/shops/${shop.id}/storefront/publish`,{method:'POST',headers:auth});
+  const config=await request(`/public/storefronts/${shop.slug}/checkout-config`);
+  assert.equal(config.deliveryMethods.length,2);
+  const order=await request(`/public/storefronts/${shop.slug}/orders`,{method:'POST',body:{customer:{name:'Кирилл',phone:'+79990000000'},deliveryMethod:'courier',paymentMethod:'cash',address:'Москва, Тверская 1',items:[{productId:product.id,quantity:2}]}});
+  assert.equal(order.total,2350);
+  assert.equal(order.status,'new');
+  const after=await request(`/workspaces/${workspace.id}/shops/${shop.id}/products/${product.id}`,{headers:auth});
+  assert.equal(after.stock,3);
+  const list=await request(`/workspaces/${workspace.id}/shops/${shop.id}/orders`,{headers:auth});
+  assert.equal(list.length,1);
+  const metrics=await request(`/workspaces/${workspace.id}/shops/${shop.id}/orders/metrics`,{headers:auth});
+  assert.equal(metrics.new,1);
+  await request(`/workspaces/${workspace.id}/shops/${shop.id}/orders/${order.id}`,{method:'PATCH',headers:auth,body:{status:'confirmed',paymentStatus:'paid'}});
+  await request(`/workspaces/${workspace.id}/shops/${shop.id}/orders/${order.id}`,{method:'PATCH',headers:auth,body:{status:'cancelled'}});
+  const restored=await request(`/workspaces/${workspace.id}/shops/${shop.id}/products/${product.id}`,{headers:auth});
+  assert.equal(restored.stock,5);
+  const detailed=await request(`/workspaces/${workspace.id}/shops/${shop.id}/orders/${order.id}`,{headers:auth});
+  assert.equal(detailed.events.length,3);
+  console.log('V6.4 checkout and orders tests passed');
+} finally { await new Promise(resolve=>server.close(resolve)); fs.rmSync(temp,{recursive:true,force:true}); }

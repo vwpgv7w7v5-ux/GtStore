@@ -1,0 +1,57 @@
+{
+  "name": "gtstore-v6-20-customer-accounts",
+  "version": "6.20.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "start": "node server.js",
+    "legacy:start": "node server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node tests/production-core.test.js && node tests/v5/domain.test.mjs",
+    "stats": "node scripts/code-stats.js",
+    "verify": "npm run check && npm test",
+    "check": "node --check server.js && node --check public/admin.js && node --check public/store.js",
+    "v6:api": "node apps/api-v6/src/server.js",
+    "v6:admin": "node scripts/serve-static.js apps/admin-v6 4173",
+    "v6:test": "node tests/v6/foundation.test.mjs && node tests/v6/catalog-engine.test.mjs && node tests/v6/import-media.test.mjs && node tests/v6/storefront-builder.test.mjs && node tests/v6/checkout-orders.test.mjs && node tests/v6/telegram-orders.test.mjs && node tests/v6/telegram-customer.test.mjs && node tests/v6/customer-crm.test.mjs && node tests/v6/promotions-loyalty-checkout.test.mjs && node tests/v6/campaigns-automation.test.mjs && node tests/v6/campaign-studio-ui.test.mjs && node tests/v6/automation-flows.test.mjs && node tests/v6/automation-studio-ui.test.mjs && node tests/v6/analytics.test.mjs && node tests/v6/team-multistore.test.mjs && node tests/v6/webhooks-integrations.test.mjs && node tests/v6/payments.test.mjs && node tests/v6/warehouse.test.mjs && node tests/v6/warehouse-ui.test.mjs && node tests/v6/delivery.test.mjs && node tests/v6/delivery-ui.test.mjs && node tests/v6/theme-builder.test.mjs && node tests/v6/theme-builder-ui.test.mjs && node tests/v6/customer-accounts.test.mjs",
+    "v6:dev": "node apps/api-v6/src/server.js",
+    "v6:stats": "node scripts/code-stats-v6.js",
+    "v6:catalog:test": "node tests/v6/catalog-engine.test.mjs",
+    "v6:import:test": "node tests/v6/import-media.test.mjs",
+    "v6:storefront": "node scripts/serve-static.js apps/storefront-v6 4174",
+    "v6:storefront:test": "node tests/v6/storefront-builder.test.mjs",
+    "v6:orders:test": "node tests/v6/checkout-orders.test.mjs",
+    "v6:telegram:test": "node tests/v6/telegram-orders.test.mjs",
+    "v6:customer:test": "node tests/v6/telegram-customer.test.mjs",
+    "v6:crm:test": "node tests/v6/customer-crm.test.mjs",
+    "v6:promotions:test": "node tests/v6/promotions-loyalty-checkout.test.mjs",
+    "v6:campaigns:test": "node tests/v6/campaigns-automation.test.mjs",
+    "v6:campaign-ui:test": "node tests/v6/campaign-studio-ui.test.mjs",
+    "v6:automations:test": "node tests/v6/automation-flows.test.mjs",
+    "v6:automation-ui:test": "node tests/v6/automation-studio-ui.test.mjs",
+    "v6:analytics:test": "node tests/v6/analytics.test.mjs",
+    "v6:team:test": "node tests/v6/team-multistore.test.mjs",
+    "v6:integrations:test": "node tests/v6/webhooks-integrations.test.mjs",
+    "v6:payments:test": "node tests/v6/payments.test.mjs",
+    "v6:warehouse:test": "node tests/v6/warehouse.test.mjs",
+    "v6:warehouse-ui:test": "node tests/v6/warehouse-ui.test.mjs",
+    "v6:delivery:test": "node tests/v6/delivery.test.mjs",
+    "v6:delivery-ui:test": "node tests/v6/delivery-ui.test.mjs",
+    "v6:theme:test": "node tests/v6/theme-builder.test.mjs",
+    "v6:theme-ui:test": "node tests/v6/theme-builder-ui.test.mjs",
+    "v6:customer-accounts:test": "node tests/v6/customer-accounts.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
+  "description": "Omnichannel commerce platform core for Telegram, MAX and web storefronts"
+}

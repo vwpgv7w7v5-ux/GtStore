@@ -1,0 +1,3 @@
+export type Listener<T>=(state:T)=>void; export class Store<T>{private listeners=new Set<Listener<T>>();constructor(private state:T){}get(){return this.state;}set(next:T|((current:T)=>T)){this.state=typeof next==='function'?(next as (c:T)=>T)(this.state):next;this.listeners.forEach(l=>l(this.state));}subscribe(listener:Listener<T>){this.listeners.add(listener);listener(this.state);return()=>this.listeners.delete(listener);}}
+export interface AppState{shopId?:string;commandOpen:boolean;sidebarCollapsed:boolean;notifications:Array<{id:string;type:'success'|'error'|'info';text:string}>;}
+export const appStore=new Store<AppState>({commandOpen:false,sidebarCollapsed:false,notifications:[]});

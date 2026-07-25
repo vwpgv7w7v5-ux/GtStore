@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@gtstore/contracts/*": ["packages/contracts/src/*"],
+      "@gtstore/domain/*": ["packages/domain/src/*"],
+      "@gtstore/ui/*": ["packages/ui/src/*"],
+      "@gtstore/adapters/*": ["packages/adapters/src/*"]
+    }
+  },
+  "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "packages/**/*.tsx"]
+}
