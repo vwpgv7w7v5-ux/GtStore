@@ -29,6 +29,7 @@ import { PaymentService } from "./payments/service.js";
 import { WarehouseService } from "./warehouse/service.js";
 import { DeliveryService } from "./delivery/service.js";
 import { CustomerPortalService } from "./customers/portal-service.js";
+import { registerOnboardingRoutes } from "./routes/onboarding.routes.js";
 export function createApp(options = {}) {
   const store = new JsonStore(options.databaseFile || "data/v6.json");
   const auth = new AuthService(store);
@@ -71,6 +72,15 @@ export function createApp(options = {}) {
     const identity = auth.authenticate(raw);
     return handler({ ...ctx, identity, token: raw });
   };
+  
+  registerOnboardingRoutes(
+    router,
+    {
+      tenancy,
+      telegram,
+    },
+    secured,
+  );
   router.add("GET", "/api/v6/health", async () => ({
     status: 200,
     body: {
