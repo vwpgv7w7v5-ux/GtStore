@@ -15,5 +15,14 @@
       "@gtstore/adapters/*": ["packages/adapters/src/*"]
     }
   },
-  "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "packages/**/*.tsx"]
+  "include": [
+    "packages/**/*.ts",
+    "packages/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "apps/admin",
+    "apps/api",
+    "apps/storefront"
+  ]
 }
