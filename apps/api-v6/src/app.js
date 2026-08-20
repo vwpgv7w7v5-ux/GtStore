@@ -1500,11 +1500,18 @@ export function createApp(options = {}) {
         });
         return fs.createReadStream(file).pipe(res);
       }
-      if (req.method === "GET" && (url.pathname === "/app" || url.pathname.startsWith("/app/"))) {
-        const relative = url.pathname === "/app" || url.pathname === "/app/"
+      if (req.method === "GET" && url.pathname === "/app") {
+        res.writeHead(302, {
+          location: `/app/${url.search || ""}`,
+          "cache-control": "no-store",
+        });
+        return res.end();
+      }
+      if (req.method === "GET" && (url.pathname === "/app/" || url.pathname.startsWith("/app/"))) {
+        const relative = url.pathname === "/app/"
           ? "index.html"
           : decodeURIComponent(url.pathname.slice("/app/".length));
-        const file = path.resolve(storefrontRoot, relative);
+        const file = path.resolve(storefrontRoot, relative || "index.html");
         if (!file.startsWith(storefrontRoot) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
           res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
           return res.end("Not found");

@@ -108,7 +108,12 @@ try {
   assert.equal(appPage.status, 200);
   const html = await appPage.text();
   assert.match(html, /telegram-web-app\.js/);
+  assert.match(html, /Telegram\.WebApp|tg\.ready/);
   assert.match(html, /storefront\.js/);
+
+  const redirected = await fetch(`${origin}/app?shop=${shop.slug}`, { redirect: 'manual' });
+  assert.equal(redirected.status, 302);
+  assert.match(redirected.headers.get('location') || '', /\/app\//);
 
   const css = await fetch(`${origin}/app/storefront.css`);
   assert.equal(css.status, 200);
