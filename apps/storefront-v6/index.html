@@ -1,1 +1,31 @@
-<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GtStore Mini App</title><link rel="stylesheet" href="./storefront.css"></head><body><div id="app"><div class="loading">Загрузка витрины…</div></div><script type="module" src="./storefront.js"></script></body></html>
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>GtStore Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function () {
+      try {
+        var path = location.pathname;
+        if (path.indexOf('/app') === 0 && path.slice(-1) !== '/') {
+          location.replace('/app/' + location.search + location.hash);
+          return;
+        }
+        var tg = window.Telegram && window.Telegram.WebApp;
+        if (!tg) return;
+        tg.ready();
+        tg.expand();
+        if (tg.setHeaderColor) tg.setHeaderColor(tg.themeParams.bg_color || '#f4f1eb');
+        if (tg.setBackgroundColor) tg.setBackgroundColor(tg.themeParams.bg_color || '#f4f1eb');
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="./storefront.css">
+</head>
+<body>
+  <div id="app"><div class="loading">Загрузка витрины…</div></div>
+  <script type="module" src="./storefront.js"></script>
+</body>
+</html>

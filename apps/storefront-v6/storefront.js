@@ -1,6 +1,31 @@
 const app=document.querySelector('#app');
-const api=localStorage.getItem('gt_api')||'http://127.0.0.1:4000/api/v6';
-const params=new URLSearchParams(location.search);const slug=params.get('shop')||localStorage.getItem('gt_shop')||'demo-store';
+const params=new URLSearchParams(location.search);
+function resolveApiBase(){
+  const fromQuery=params.get('api');
+  if(fromQuery)return fromQuery.replace(/\/$/,'');
+  const stored=localStorage.getItem('gt_api');
+  if(stored)return stored.replace(/\/$/,'');
+  if(location.protocol==='https:'||location.pathname.startsWith('/app'))return `${location.origin}/api/v6`;
+  if(location.port==='4174')return `${location.protocol}//${location.hostname}:4000/api/v6`;
+  return `${location.origin}/api/v6`;
+}
+const api=resolveApiBase();
+const slug=params.get('shop')||localStorage.getItem('gt_shop')||location.pathname.split('/').filter(Boolean).pop()||'demo-store';
+function bootTelegram(){try{const tg=window.Telegram?.WebApp;if(!tg)return;tg.ready();tg.expand();tg.setHeaderColor?.(tg.themeParams?.bg_color||'#f4f1eb');tg.setBackgroundColor?.(tg.themeParams?.bg_color||'#f4f1eb')}catch{}}
+bootTelegram();
+async function fetchJson(url,options={}){
+  const ctrl=typeof AbortController!=='undefined'?new AbortController():null;
+  const timer=ctrl?setTimeout(()=>ctrl.abort(),15000):null;
+  try{
+    const r=await fetch(url,{...options,signal:ctrl?.signal});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error?.message||j.error||`HTTP ${r.status}`);
+    return j;
+  }catch(e){
+    if(e.name==='AbortError')throw new Error('Сервер не ответил за 15с. Проверьте HTTPS-домен и API.');
+    throw e;
+  }finally{if(timer)clearTimeout(timer)}
+}
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=v=>Number(v||0).toLocaleString('ru-RU');
 let data,checkoutConfig,cart=[],telegramIdentity=null,customerProfile=null;
@@ -26,4 +51,10 @@ async function authenticateTelegram(){const initData=window.Telegram?.WebApp?.in
 async function loadProfile(){const token=telegramIdentity?.token||localStorage.getItem(`gt_customer_${slug}`);if(!token)return null;try{customerProfile=await fetch(`${api}/public/customer/me`,{headers:{authorization:`Bearer ${token}`}}).then(async r=>{const j=await r.json();if(!r.ok)throw new Error(j.error?.message||'Profile failed');return j});return customerProfile}catch{return null}}
 async function openProfile(){await loadProfile();const modal=document.querySelector('#modal');const orders=customerProfile?.orders||[];modal.innerHTML=`<div class="modal-backdrop"><div class="success-card profile-card"><button id="close-profile">×</button><h2>Мои заказы</h2><p>${esc(customerProfile?.customer?.name||telegramIdentity?.customer?.firstName||'Покупатель')} · ${orders.length} заказов</p><div class="profile-orders">${orders.length?orders.map(o=>`<article><b>Заказ №${esc(o.number)}</b><span>${esc(o.status)} · ${money(o.total)} ₽</span><small>${new Date(o.createdAt).toLocaleString('ru-RU')}</small></article>`).join(''):'<p>Заказов пока нет.</p>'}</div></div></div>`;modal.querySelector('#close-profile').onclick=()=>modal.innerHTML=''}
 
-Promise.all([fetch(`${api}/public/storefronts/${encodeURIComponent(slug)}`).then(async r=>{const j=await r.json();if(!r.ok)throw new Error(j.error?.message||'Не удалось открыть магазин');return j}),fetch(`${api}/public/storefronts/${encodeURIComponent(slug)}/checkout-config`).then(r=>r.json())]).then(([store,config])=>{data=store;checkoutConfig=config;track('visit');authenticateTelegram().then(()=>{render();window.Telegram?.WebApp?.ready?.()})}).catch(e=>app.innerHTML=`<div class="error"><h1>Витрина недоступна</h1><p>${esc(e.message)}</p><small>Проверьте параметр ?shop=slug и публикацию витрины.</small></div>`);
+Promise.all([
+  fetchJson(`${api}/public/storefronts/${encodeURIComponent(slug)}`),
+  fetchJson(`${api}/public/storefronts/${encodeURIComponent(slug)}/checkout-config`).catch(()=>({deliveryMethods:[],paymentMethods:[]}))
+]).then(([store,config])=>{
+  data=store;checkoutConfig=config||{deliveryMethods:[],paymentMethods:[]};track('visit');
+  return authenticateTelegram().then(()=>{render();bootTelegram()})
+}).catch(e=>{bootTelegram();app.innerHTML=`<div class="error"><h1>Витрина недоступна</h1><p>${esc(e.message)}</p><small>API: ${esc(api)} · shop=${esc(slug)}. Опубликуйте витрину и проверьте HTTPS.</small></div>`});
