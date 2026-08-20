@@ -37,16 +37,33 @@ export class TelegramService {
   }
 
   publicConfig(config) {
-    if (!config) return { connected:false, enabled:false, adminChatId:'', botUsername:'', webhookUrl:'', updatedAt:null };
+    if (!config) return { connected:false, enabled:false, adminChatId:'', botUsername:'', webhookUrl:'', miniAppUrl:'', updatedAt:null };
     return {
       connected:Boolean(config.tokenEncrypted),
       enabled:Boolean(config.enabled),
       adminChatId:config.adminChatId || '',
       botUsername:config.botUsername || '',
       webhookUrl:config.webhookUrl || '',
+      miniAppUrl:config.miniAppUrl || '',
       updatedAt:config.updatedAt || null,
       lastError:config.lastError || '',
     };
+  }
+
+  assertMiniAppUrl(url) {
+    const value = String(url || '').trim();
+    if (!value) return '';
+    assert(/^https:\/\//i.test(value), 'TELEGRAM_MINIAPP_URL_INVALID', 'Mini App URL должен начинаться с https://', 400);
+    return value.replace(/\/$/, '');
+  }
+
+  async syncMenuButton(token, miniAppUrl, buttonText = 'Открыть магазин') {
+    const url = this.assertMiniAppUrl(miniAppUrl);
+    if (!url) return null;
+    await this.api(token, 'setChatMenuButton', {
+      menu_button: { type:'web_app', text:String(buttonText || 'Открыть магазин').slice(0, 64), web_app:{ url } },
+    });
+    return url;
   }
 
   getConfig(userId, workspaceId, shopId) {
@@ -70,14 +87,21 @@ export class TelegramService {
     assert(/^\d+:[A-Za-z0-9_-]{20,}$/.test(token), 'TELEGRAM_TOKEN_INVALID', 'Некорректный токен Telegram');
     const bot = await this.api(token, 'getMe');
     const webhookUrl = String(input.webhookUrl || '').trim();
+    const miniAppUrl = this.assertMiniAppUrl(input.miniAppUrl);
     if (webhookUrl) await this.api(token, 'setWebhook', { url:webhookUrl, secret_token:String(input.webhookSecret || '') || undefined });
+    let menuButtonError = '';
+    if (miniAppUrl) {
+      try { await this.syncMenuButton(token, miniAppUrl, input.buttonText || 'Открыть магазин'); }
+      catch (error) { menuButtonError = error.message || 'Не удалось установить Menu Button'; }
+    }
     return this.store.transaction(userId, db => {
       db.telegramConfigs ||= [];
       let config = db.telegramConfigs.find(item => item.shopId === shopId);
       const data = {
         workspaceId, shopId, tokenEncrypted:this.encrypt(token), adminChatId:String(input.adminChatId || '').trim(),
         botId:String(bot.id), botUsername:bot.username || '', enabled:input.enabled !== false, webhookUrl,
-        webhookSecret:String(input.webhookSecret || '').trim(), updatedAt:now(), lastError:'',
+        webhookSecret:String(input.webhookSecret || '').trim(), miniAppUrl,
+        updatedAt:now(), lastError:menuButtonError,
       };
       if (config) Object.assign(config, data); else { config = { id:id('tgc'), createdAt:now(), ...data }; db.telegramConfigs.push(config); }
       return this.publicConfig(config);
@@ -154,6 +178,31 @@ export class TelegramService {
     const config = (state.telegramConfigs || []).find(item => item.shopId === shopId && item.enabled);
     assert(config, 'TELEGRAM_NOT_CONFIGURED', 'Telegram не настроен', 404);
     if (config.webhookSecret) assert(secret === config.webhookSecret, 'TELEGRAM_WEBHOOK_FORBIDDEN', 'Неверный секрет webhook', 403);
+    const token = this.decrypt(config.tokenEncrypted);
+    const message = update?.message || update?.edited_message;
+    if (message) {
+      const text = String(message.text || '').trim();
+      const cmd = text.split(/\s+/)[0].replace(/^\//, '').split('@')[0].toLowerCase();
+      if (['start', 'shop', 'catalog', 'menu'].includes(cmd)) {
+        const shop = state.shops.find(item => item.id === shopId);
+        let miniAppUrl = '';
+        try { miniAppUrl = this.assertMiniAppUrl(config.miniAppUrl); } catch { miniAppUrl = ''; }
+        const reply = {
+          chat_id: message.chat.id,
+          text: `Добро пожаловать в ${shop?.name || 'магазин'}!`,
+        };
+        if (miniAppUrl) {
+          reply.reply_markup = {
+            inline_keyboard: [[{ text:'Открыть магазин', web_app:{ url:miniAppUrl } }]],
+          };
+        } else {
+          reply.text += '\n\n⚠️ Mini App URL не настроен. Укажите HTTPS-адрес витрины в настройках Telegram.';
+        }
+        await this.api(token, 'sendMessage', reply);
+        return { ok:true, opened:Boolean(miniAppUrl) };
+      }
+      return { ok:true, ignored:true };
+    }
     const callback = update?.callback_query;
     if (!callback) return {ok:true,ignored:true};
     const match = /^order:([^:]+):([^:]+)$/.exec(callback.data || '');
@@ -164,7 +213,6 @@ export class TelegramService {
     assert(membership, 'TELEGRAM_ACTOR_NOT_FOUND', 'Не найден сотрудник магазина', 403);
     const updated = await this.orders.update(membership.userId, order.workspaceId, shopId, order.id, {status:match[2]});
     await this.notifyCustomer(updated);
-    const token = this.decrypt(config.tokenEncrypted);
     await this.api(token, 'answerCallbackQuery', {callback_query_id:callback.id,text:`Статус: ${updated.status}`}).catch(()=>undefined);
     if (callback.message) await this.api(token, 'editMessageReplyMarkup', {chat_id:callback.message.chat.id,message_id:callback.message.message_id,reply_markup:this.keyboard(updated)}).catch(()=>undefined);
     return {ok:true,orderId:updated.id,status:updated.status};

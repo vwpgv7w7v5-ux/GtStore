@@ -1,7 +1,7 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import { URL } from "node:url";
+import { URL, fileURLToPath } from "node:url";
 import { JsonStore } from "./core/store.js";
 import { AuthService } from "./auth/service.js";
 import { TenancyService } from "./tenancy/service.js";
@@ -32,6 +32,10 @@ import { CustomerPortalService } from "./customers/portal-service.js";
 import { registerOnboardingRoutes } from "./routes/onboarding.routes.js";
 export function createApp(options = {}) {
   const store = new JsonStore(options.databaseFile || "data/v6.json");
+  const storefrontRoot = path.resolve(
+    options.storefrontDirectory ||
+      path.join(path.dirname(fileURLToPath(import.meta.url)), "../../storefront-v6"),
+  );
   const auth = new AuthService(store);
   const tenancy = new TenancyService(store);
   const catalog = new CatalogService(store, tenancy);
@@ -1492,6 +1496,33 @@ export function createApp(options = {}) {
         res.writeHead(200, {
           "content-type": type,
           "cache-control": "public, max-age=31536000, immutable",
+          "access-control-allow-origin": "*",
+        });
+        return fs.createReadStream(file).pipe(res);
+      }
+      if (req.method === "GET" && (url.pathname === "/app" || url.pathname.startsWith("/app/"))) {
+        const relative = url.pathname === "/app" || url.pathname === "/app/"
+          ? "index.html"
+          : decodeURIComponent(url.pathname.slice("/app/".length));
+        const file = path.resolve(storefrontRoot, relative);
+        if (!file.startsWith(storefrontRoot) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+          res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+          return res.end("Not found");
+        }
+        const type = {
+          ".html": "text/html; charset=utf-8",
+          ".js": "text/javascript; charset=utf-8",
+          ".css": "text/css; charset=utf-8",
+          ".json": "application/json; charset=utf-8",
+          ".png": "image/png",
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".webp": "image/webp",
+          ".svg": "image/svg+xml",
+        }[path.extname(file).toLowerCase()] || "application/octet-stream";
+        res.writeHead(200, {
+          "content-type": type,
+          "cache-control": "no-store",
           "access-control-allow-origin": "*",
         });
         return fs.createReadStream(file).pipe(res);
