@@ -1,0 +1,139 @@
+name: Test and deploy GtStore
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'codex/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    name: Node.js checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the revision under test
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --include=dev --no-audit --no-fund
+      - name: Check package types
+        run: npm run typecheck
+      - name: Check the legacy application
+        run: npm run verify
+      - name: Test v6, imports and persistent photos
+        run: npm run v6:test
+      - name: Test release and rollback scripts
+        run: bash deploy/tests/release.test.sh
+
+  deploy:
+    name: Deploy the tested main revision
+    needs: test
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    concurrency:
+      group: gtstore-production
+      cancel-in-progress: false
+    steps:
+      - name: Check out the exact tested revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check whether main has moved ahead
+        id: revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          current=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [[ "$current" == "$GITHUB_SHA" ]]; then
+            printf 'current=true\n' >> "$GITHUB_OUTPUT"
+          else
+            printf 'current=false\n' >> "$GITHUB_OUTPUT"
+            printf 'Skipping superseded main revision %s; current main is %s.\n' "$GITHUB_SHA" "$current"
+          fi
+      - name: Package tracked application source
+        if: steps.revision.outputs.current == 'true'
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          archive="$RUNNER_TEMP/gtstore-$GITHUB_SHA.tar"
+          metadata=$(mktemp -d "$RUNNER_TEMP/gtstore-meta.XXXXXX")
+          trap 'rm -rf -- "$metadata"' EXIT
+          git archive --format=tar --output="$archive" "$GITHUB_SHA" -- . \
+            ':(exclude)data/**' ':(exclude)uploads/**' \
+            ':(exclude)**/node_modules/**' ':(exclude).env' ':(exclude).env.*'
+          printf '%s\n' "$GITHUB_SHA" > "$metadata/DEPLOY_COMMIT"
+          tar --append --file="$archive" -C "$metadata" DEPLOY_COMMIT
+          gzip -n "$archive"
+      - name: Upload and activate the release
+        if: steps.revision.outputs.current == 'true'
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST || '72.56.28.133' }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER || 'root' }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_SSH_KEY:?Add the deployment private key to GitHub Actions secrets}"
+          : "${DEPLOY_KNOWN_HOSTS:?Add verified server host keys to GitHub Actions secrets}"
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]] && ((10#$DEPLOY_PORT >= 1 && 10#$DEPLOY_PORT <= 65535))
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          ssh_directory=$(mktemp -d "$RUNNER_TEMP/gtstore-ssh.XXXXXX")
+          trap 'rm -rf -- "$ssh_directory"' EXIT
+          chmod 700 "$ssh_directory"
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$ssh_directory/id_deploy"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$ssh_directory/known_hosts"
+          unset DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS
+          ssh-keygen -y -P '' -f "$ssh_directory/id_deploy" > /dev/null
+          host_pattern="$DEPLOY_HOST"
+          if [[ "$DEPLOY_PORT" != 22 ]]; then host_pattern="[$DEPLOY_HOST]:$DEPLOY_PORT"; fi
+          ssh-keygen -F "$host_pattern" -f "$ssh_directory/known_hosts" > /dev/null
+          options=(-F /dev/null -i "$ssh_directory/id_deploy"
+            -o BatchMode=yes -o IdentitiesOnly=yes -o IdentityAgent=none
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_directory/known_hosts"
+            -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=15
+            -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          upload_directory=$(ssh "${options[@]}" -p "$DEPLOY_PORT" "$target" \
+            'umask 077; mktemp -d /tmp/gtstore-upload.XXXXXX')
+          [[ "$upload_directory" =~ ^/tmp/gtstore-upload\.[a-zA-Z0-9]+$ ]]
+          remote_archive="$upload_directory/gtstore-$GITHUB_SHA.tar.gz"
+          scp "${options[@]}" -P "$DEPLOY_PORT" \
+            "$RUNNER_TEMP/gtstore-$GITHUB_SHA.tar.gz" "$target:$remote_archive"
+          ssh "${options[@]}" -p "$DEPLOY_PORT" "$target" \
+            bash -s -- "$remote_archive" "$GITHUB_SHA" <<'REMOTE'
+          set -euo pipefail
+          archive=$1
+          commit=$2
+          [[ "$archive" =~ ^/tmp/gtstore-upload\.[a-zA-Z0-9]+/gtstore-[0-9a-f]{40}\.tar\.gz$ ]]
+          [[ "$commit" =~ ^[0-9a-f]{40}$ ]]
+          script_directory=$(mktemp -d /tmp/gtstore-release-script.XXXXXX)
+          cleanup() {
+            rm -rf -- "$script_directory"
+            rm -f -- "$archive"
+            rmdir -- "$(dirname "$archive")" || true
+          }
+          trap cleanup EXIT
+          tar -xOzf "$archive" deploy/release.sh > "$script_directory/release.sh"
+          bash "$script_directory/release.sh" "$archive" "$commit"
+          REMOTE

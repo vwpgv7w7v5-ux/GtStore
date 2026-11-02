@@ -1,10 +1,17 @@
 const app=document.querySelector('#app');
-const api=localStorage.getItem('gt_api')||'http://127.0.0.1:4000/api/v6';
+const api=(localStorage.getItem('gt_api')||(location.protocol==='https:'?'/api/v6':'http://127.0.0.1:4000/api/v6')).replace(/\/$/,'');
 const params=new URLSearchParams(location.search);const slug=params.get('shop')||localStorage.getItem('gt_shop')||'demo-store';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=v=>Number(v||0).toLocaleString('ru-RU');
 let data,checkoutConfig,cart=[],telegramIdentity=null,customerProfile=null;
-const image=p=>p.images?.[0]?.url||p.imageUrl||'';
+const image=p=>{
+  const value=p.images?.[0]?.url||p.imageUrl;
+  if(!value)return '';
+  try{
+    const url=new URL(String(value),new URL(api,location.href).origin+'/');
+    return ['http:','https:'].includes(url.protocol)&&!url.username&&!url.password?url.href:'';
+  }catch{return '';}
+};
 const totalItems=()=>cart.reduce((sum,item)=>sum+item.quantity,0);
 const subtotal=()=>cart.reduce((sum,item)=>sum+Number(item.product.price||0)*item.quantity,0);
 const analyticsSession=sessionStorage.getItem('gt_analytics_session')||crypto.randomUUID();sessionStorage.setItem('gt_analytics_session',analyticsSession);

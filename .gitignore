@@ -1,2 +1,12 @@
 
 node_modules/
+.env
+.env.*
+!.env.example
+*.env
+/data/v6.json
+/data/v6.json.tmp
+/uploads/
+/public/uploads/
+*.log
+.DS_Store

@@ -1,0 +1,31 @@
+# Add these locations to the EXISTING HTTPS server block. Preserve its working
+# server_name, listen 443, ssl_certificate and ssl_certificate_key settings.
+# The example deliberately does not replace a live nginx/TLS configuration.
+
+client_max_body_size 20m;
+
+location = /admin {
+    return 308 /admin/;
+}
+
+location /admin/ {
+    alias /opt/gtstore/current/apps/admin-v6/;
+    index index.html;
+    add_header Cache-Control "no-cache";
+}
+
+location /api/v6/ {
+    proxy_pass http://127.0.0.1:4000;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 300s;
+}
+
+location / {
+    root /opt/gtstore/current/apps/storefront-v6;
+    index index.html;
+    try_files $uri $uri/ =404;
+    add_header Cache-Control "no-cache";
+}

@@ -61,7 +61,15 @@ const products = (await request(root + '/products', { token })).data;
 assert.equal(products.length, 2);
 assert.equal(products[0].shopId, shop.id);
 
-await request(root + '/media/' + media.data.filename, { method: 'DELETE', token });
+const inUse = await request(root + '/media/' + media.data.filename, { method: 'DELETE', token });
+assert.equal(inUse.response.status, 409);
+assert.equal(inUse.data.error.code, 'MEDIA_IN_USE');
+assert.equal(fs.existsSync(path.join(mediaDirectory, media.data.filename)), true);
+for (const product of products) {
+  await request(root + '/products/' + product.id, { method: 'PATCH', token, body: { images: [] } });
+}
+const deleted = await request(root + '/media/' + media.data.filename, { method: 'DELETE', token });
+assert.equal(deleted.response.status, 200);
 assert.equal(fs.existsSync(path.join(mediaDirectory, media.data.filename)), false);
 
 await new Promise(resolve => server.close(resolve));

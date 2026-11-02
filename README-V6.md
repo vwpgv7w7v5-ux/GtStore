@@ -1,5 +1,8 @@
 # GtStore v6.0 Sprint 1 Foundation
 
+Обновление рабочего сайта из GitHub описано в [GitHub → Timeweb](docs/GITHUB_DEPLOY.md).
+Код обновляется через Actions, а база и фотографии хранятся отдельно на VPS.
+
 ## Запуск без npm install
 
 Терминал 1:

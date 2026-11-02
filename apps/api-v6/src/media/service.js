@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { assert } from '../core/errors.js';
+import { AppError, assert } from '../core/errors.js';
+import { downloadRemoteImage } from './remote-images.js';
 
 const ALLOWED = new Map([
   ['image/jpeg', '.jpg'],
@@ -15,6 +16,8 @@ export class MediaService {
     this.directory = path.resolve(options.directory || 'uploads/v6');
     this.publicPrefix = options.publicPrefix || '/api/v6/media/';
     this.maxBytes = options.maxBytes || 8 * 1024 * 1024;
+    this.remoteOptions = options.remoteOptions || {};
+    this.pendingImports = new Map();
     fs.mkdirSync(this.directory, { recursive: true });
   }
 
@@ -48,11 +51,71 @@ export class MediaService {
     };
   }
 
+  async importRemote(source) {
+    const key = crypto.createHash('sha256').update(String(source)).digest('hex');
+    if (this.pendingImports.has(key)) return this.pendingImports.get(key);
+    const pending = this.cacheRemote(String(source), key);
+    this.pendingImports.set(key, pending);
+    try { return await pending; }
+    catch (error) {
+      if (error instanceof AppError) {
+        try {
+          const address = new URL(source);
+          const reference = `${address.origin}${address.pathname}`.slice(0, 200);
+          error.message += ` (${reference})`;
+        } catch {}
+      }
+      throw error;
+    }
+    finally { this.pendingImports.delete(key); }
+  }
+
+  async cacheRemote(source, key) {
+    // Cache metadata lives below a subdirectory which the basename-only media
+    // route cannot serve. Both bytes and mapping survive an application restart.
+    const cacheDirectory = path.join(this.directory, '.import-cache');
+    const cacheFile = path.join(cacheDirectory, `${key}.json`);
+    try {
+      const cached = JSON.parse(await fs.promises.readFile(cacheFile, 'utf8'));
+      if (cached.filename === path.basename(cached.filename) && ALLOWED.has(cached.mime)) {
+        const file = await fs.promises.lstat(path.join(this.directory, cached.filename));
+        if (file.isFile() && file.size === cached.size && file.size <= this.maxBytes) {
+          const bytes = await fs.promises.readFile(path.join(this.directory, cached.filename));
+          if (crypto.createHash('sha256').update(bytes).digest('hex') === cached.id) return { ...cached, url: `${this.publicPrefix}${cached.filename}` };
+        }
+      }
+    } catch (error) {
+      if (!['ENOENT', 'ENOTDIR'].includes(error.code) && !(error instanceof SyntaxError) && !(error instanceof TypeError)) throw error;
+    }
+    const { buffer, mime } = await downloadRemoteImage(source, { ...this.remoteOptions, maxBytes: this.maxBytes });
+    const digest = crypto.createHash('sha256').update(buffer).digest('hex');
+    const filename = `import-${digest}${ALLOWED.get(mime)}`;
+    const mediaTemporary = path.join(this.directory, `.import-${digest}.${crypto.randomUUID()}.tmp`);
+    try {
+      await fs.promises.writeFile(mediaTemporary, buffer, { flag: 'wx' });
+      await fs.promises.rename(mediaTemporary, path.join(this.directory, filename));
+    } finally { await fs.promises.rm(mediaTemporary, { force: true }); }
+    const metadata = {
+      id: digest, filename, originalName: filename, mime, size: buffer.length,
+      alt: '', url: `${this.publicPrefix}${filename}`, createdAt: new Date().toISOString(),
+    };
+    await fs.promises.mkdir(cacheDirectory, { recursive: true });
+    const temporary = `${cacheFile}.${crypto.randomUUID()}.tmp`;
+    try {
+      await fs.promises.writeFile(temporary, JSON.stringify(metadata), { flag: 'wx' });
+      await fs.promises.rename(temporary, cacheFile);
+    } finally { await fs.promises.rm(temporary, { force: true }); }
+    return metadata;
+  }
+
   resolve(filename) {
     const safe = path.basename(String(filename || ''));
-    assert(safe === filename && safe, 'MEDIA_PATH_INVALID', 'Некорректный путь к файлу', 400);
+    assert(safe === filename && /^[a-z0-9][a-z0-9_.-]*\.(?:jpe?g|png|webp|gif)$/i.test(safe), 'MEDIA_PATH_INVALID', 'Некорректный путь к файлу', 400);
     const file = path.join(this.directory, safe);
-    assert(fs.existsSync(file), 'MEDIA_NOT_FOUND', 'Файл не найден', 404);
+    let stat;
+    try { stat = fs.lstatSync(file); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    assert(stat?.isFile(), 'MEDIA_NOT_FOUND', 'Файл не найден', 404);
     return file;
   }
 

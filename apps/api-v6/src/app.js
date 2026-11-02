@@ -7,7 +7,7 @@ import { AuthService } from "./auth/service.js";
 import { TenancyService } from "./tenancy/service.js";
 import { CatalogService } from "./catalog/service.js";
 import { Router, json, readJson } from "./http/router.js";
-import { errorPayload } from "./core/errors.js";
+import { AppError, errorPayload } from "./core/errors.js";
 import { id } from "./core/ids.js";
 import { MediaService } from "./media/service.js";
 import { ImportService } from "./imports/service.js";
@@ -36,9 +36,10 @@ export function createApp(options = {}) {
   const tenancy = new TenancyService(store);
   const catalog = new CatalogService(store, tenancy);
   const media = new MediaService({
-    directory: options.mediaDirectory || "uploads/v6",
+    directory: options.mediaDirectory || process.env.V6_MEDIA_DIRECTORY || "uploads/v6",
+    ...options.mediaOptions,
   });
-  const imports = new ImportService(catalog);
+  const imports = new ImportService(catalog, media);
   const storefront = new StorefrontService(store, tenancy, catalog);
   const orders = new OrderService(store, tenancy);
   const telegram = new TelegramService(store, tenancy, orders, {
@@ -86,6 +87,7 @@ export function createApp(options = {}) {
     body: {
       ok: true,
       version: "6.20.0",
+      commit: options.deploymentCommit || process.env.GTSTORE_DEPLOY_COMMIT || null,
       revision: store.snapshot().revision,
       time: new Date().toISOString(),
     },
@@ -760,6 +762,11 @@ export function createApp(options = {}) {
         params.shopId,
         "manager",
       );
+      const inUse = store.snapshot().products.some(product => (product.images || []).some(image => {
+        try { return new URL(image.url, 'https://local.invalid').pathname === `${media.publicPrefix}${params.filename}`; }
+        catch { return false; }
+      }));
+      if (inUse) throw new AppError('MEDIA_IN_USE', 'Фотография используется товарами. Сначала удалите её из карточек товаров.', 409);
       return { status: 200, body: await media.remove(params.filename) };
     }),
   );
@@ -1494,7 +1501,12 @@ export function createApp(options = {}) {
           "cache-control": "public, max-age=31536000, immutable",
           "access-control-allow-origin": "*",
         });
-        return fs.createReadStream(file).pipe(res);
+        const stream = fs.createReadStream(file);
+        stream.on('error', () => {
+          if (res.headersSent) res.destroy();
+          else res.writeHead(404).end();
+        });
+        return stream.pipe(res);
       }
       if (req.method === "OPTIONS") {
         res.writeHead(204, {

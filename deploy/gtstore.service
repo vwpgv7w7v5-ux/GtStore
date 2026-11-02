@@ -1,0 +1,24 @@
+[Unit]
+Description=GtStore v6 API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gtstore
+Group=gtstore
+WorkingDirectory=/var/lib/gtstore
+EnvironmentFile=/etc/gtstore/gtstore.env
+EnvironmentFile=/opt/gtstore/current/.release.env
+ExecStart=/usr/bin/node /opt/gtstore/current/apps/api-v6/src/server.js
+Restart=on-failure
+RestartSec=3
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/gtstore
+
+[Install]
+WantedBy=multi-user.target

@@ -212,4 +212,90 @@ export class CatalogService {
     });
     return { valid: errors.length === 0, total: rows.length, errors, warnings, rows: normalized.slice(0, 100) };
   }
+
+  // A catalogue import is one durable write, rather than one whole-file rewrite per row.
+  async importBatch(userId, workspaceId, shopId, inputs, categories = [], options = {}) {
+    this.ensureShop(userId, workspaceId, shopId, 'manager');
+    return this.store.transaction(userId, db => {
+      const categoryIndex = new Map(db.categories.filter(c => c.shopId === shopId)
+        .map(c => [`${c.parentId || ''}:${c.name.trim().toLowerCase()}`, c]));
+      const slugs = new Set(db.categories.filter(c => c.shopId === shopId).map(c => c.slug));
+      let createdCategories = 0;
+      const ensureCategory = (value, parent = null) => {
+        const name = String(value || '').trim();
+        if (!name) return parent;
+        const key = `${parent?.id || ''}:${name.toLowerCase()}`;
+        if (categoryIndex.has(key)) return categoryIndex.get(key);
+        const base = slugify(parent ? `${parent.slug}-${name}` : name) || 'category';
+        let slug = base;
+        for (let suffix = 2; slugs.has(slug); suffix++) slug = `${base}-${suffix}`;
+        const category = { id: id('cat'), shopId, parentId: parent?.id || null, name, slug,
+          description: '', position: db.categories.filter(c => c.shopId === shopId).length,
+          active: true, createdAt: now(), updatedAt: now() };
+        db.categories.push(category);
+        slugs.add(slug);
+        categoryIndex.set(key, category);
+        createdCategories++;
+        return category;
+      };
+      for (const entry of categories) {
+        const parent = ensureCategory(entry.name);
+        if (entry.childName) ensureCategory(entry.childName, parent);
+      }
+      const existingBySku = new Map();
+      const skuOwners = new Map();
+      for (const product of db.products.filter(p => p.shopId === shopId)) {
+        existingBySku.set(product.sku, product);
+        skuOwners.set(product.sku, product.id);
+        for (const variant of product.variants || []) skuOwners.set(variant.sku, product.id);
+      }
+      const products = [], errors = [];
+      let created = 0, updated = 0;
+      for (const input of inputs) {
+        try {
+          const name = String(input.name || '').trim(), sku = String(input.sku || '').trim();
+          assert(name, 'PRODUCT_NAME_REQUIRED', 'Укажите название товара');
+          assert(sku, 'SKU_REQUIRED', 'Укажите SKU');
+          assert(Number.isFinite(Number(input.price)) && Number(input.price) >= 0, 'IMPORT_PRICE_INVALID', 'Некорректная цена');
+          assert(Number.isFinite(Number(input.stock)) && Number(input.stock) >= 0, 'IMPORT_STOCK_INVALID', 'Некорректный остаток');
+          const existing = existingBySku.get(sku);
+          assert(!existing || options.updateExisting !== false, 'SKU_EXISTS', `SKU ${sku} уже используется`);
+          assert(!skuOwners.has(sku) || skuOwners.get(sku) === existing?.id, 'SKU_EXISTS', `SKU ${sku} уже используется вариацией`);
+          const variants = normalizeVariants((input.variants || []).map(v => ({ ...v,
+            id: existing?.variants?.find(old => old.sku === v.sku)?.id })), sku);
+          for (const variant of variants) {
+            assert(variant.sku !== sku && (!skuOwners.has(variant.sku) || skuOwners.get(variant.sku) === existing?.id),
+              'SKU_EXISTS', `SKU ${variant.sku} уже используется`);
+            assert(Number.isFinite(variant.price) && Number.isFinite(variant.stock), 'IMPORT_VARIANT_INVALID', 'Некорректная цена или остаток вариации');
+          }
+          const parent = ensureCategory(input.category);
+          const category = input.subcategory ? ensureCategory(input.subcategory, parent) : parent;
+          const data = { name, sku, categoryId: category?.id || null,
+            price: money(input.price), stock: integer(input.stock), brand: String(input.brand || ''),
+            description: String(input.description || ''),
+            images: input.images === undefined && existing ? existing.images : normalizeImages(input.images), variants,
+            active: input.active !== false, updatedAt: now() };
+          let product;
+          if (existing) {
+            for (const old of existing.variants || []) if (skuOwners.get(old.sku) === existing.id) skuOwners.delete(old.sku);
+            Object.assign(existing, data, { version: (existing.version || 1) + 1 });
+            product = existing;
+            updated++;
+          } else {
+            product = { id: id('prd'), shopId, ...data, compareAtPrice: null, archived: false, tags: [], createdAt: now(), version: 1 };
+            db.products.push(product);
+            existingBySku.set(sku, product);
+            created++;
+          }
+          skuOwners.set(sku, product.id);
+          for (const variant of variants) skuOwners.set(variant.sku, product.id);
+          products.push(product);
+        } catch (error) {
+          if (!options.skipInvalid) throw error;
+          errors.push({ sku: String(input.sku || ''), code: error.code || 'IMPORT_ERROR', message: error.message });
+        }
+      }
+      return { imported: products.length, created, updated, failed: errors.length, createdCategories, products, errors };
+    });
+  }
 }

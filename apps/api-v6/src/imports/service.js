@@ -1,4 +1,4 @@
-import { assert } from '../core/errors.js';
+import { AppError, assert } from '../core/errors.js';
 
 const aliases = {
   name: ['name', 'название', 'товар', 'наименование'],
@@ -9,7 +9,7 @@ const aliases = {
   subcategory: ['subcategory', 'подкатегория'],
   brand: ['brand', 'бренд'],
   description: ['description', 'описание'],
-  image: ['image', 'imageurl', 'изображение', 'ссылка на изображение'],
+  image: ['image', 'imageurl', 'изображение', 'фото', 'ссылка на изображение'],
   variant: ['variant', 'вариация', 'вкус'],
   barcode: ['barcode', 'штрихкод'],
 };
@@ -48,7 +48,7 @@ function parseCsvLine(line, delimiter) {
 }
 
 export class ImportService {
-  constructor(catalog) { this.catalog = catalog; }
+  constructor(catalog, media) { this.catalog = catalog; this.media = media; }
 
   parseCsv(text) {
     const clean = String(text || '').replace(/^\uFEFF/, '').trim();
@@ -66,7 +66,9 @@ export class ImportService {
     let XLSX;
     try { XLSX = await import('xlsx'); }
     catch { assert(false, 'XLSX_DEPENDENCY_MISSING', 'Для XLSX выполните npm install', 503); }
-    const workbook = XLSX.read(Buffer.from(base64, 'base64'), { type: 'buffer', cellDates: true });
+    let workbook;
+    try { workbook = XLSX.read(Buffer.from(base64, 'base64'), { type: 'buffer', cellDates: true }); }
+    catch { assert(false, 'IMPORT_FILE_INVALID', 'Не удалось прочитать Excel-файл. Загрузите файл XLSX или XLS.'); }
     const sheets = {};
     for (const name of workbook.SheetNames) sheets[name] = XLSX.utils.sheet_to_json(workbook.Sheets[name], { defval: '' });
     return { sheets };
@@ -82,15 +84,35 @@ export class ImportService {
       parentName: row.Подкатегория ? (row.Категория || '') : (row.parent || ''),
       childName: row.Подкатегория || '',
     })).filter(item => item.name || item.childName);
-    const rows = workbook.sheets[productSheet].map(canonicalRow);
+    const rows = workbook.sheets[productSheet].map(canonicalRow).map(row => ({ ...row,
+      name: String(row.name || '').trim(), sku: String(row.sku ?? '').trim(),
+      category: String(row.category || '').trim(), subcategory: String(row.subcategory || '').trim(),
+      price: this.number(row.price), stock: this.number(row.stock), image: String(row.image || '').trim(),
+    }));
     return { productSheet, categorySheet, categories, rows };
+  }
+
+  number(value) {
+    if (value == null || String(value).trim() === '') return 0;
+    return Number(String(value).trim().replace(/[\s\u00a0\u202f]/g, '').replace(',', '.'));
   }
 
   preview(userId, workspaceId, shopId, workbook) {
     const normalized = this.normalizeWorkbook(workbook);
     const validation = this.catalog.importPreview(userId, workspaceId, shopId, normalized.rows);
+    normalized.rows.forEach((row, index) => {
+      for (const [field, label] of [['price', 'цена'], ['stock', 'остаток']]) {
+        if (!Number.isFinite(row[field]) || row[field] < 0) validation.errors.push({ line: index + 2, field, message: `Некорректный ${label}` });
+      }
+    });
+    validation.valid = validation.errors.length === 0;
+    const existing = new Set(this.catalog.products(userId, workspaceId, shopId).map(p => p.sku));
+    const skus = new Set(normalized.rows.map(row => row.sku));
     return {
       ...validation,
+      created: [...skus].filter(sku => !existing.has(sku)).length,
+      updated: [...skus].filter(sku => existing.has(sku)).length,
+      uniqueImages: new Set(normalized.rows.map(row => row.image).filter(Boolean)).size,
       sheets: Object.keys(workbook.sheets || {}).map(name => ({ name, rows: workbook.sheets[name].length })),
       productSheet: normalized.productSheet,
       categorySheet: normalized.categorySheet || null,
@@ -101,55 +123,62 @@ export class ImportService {
 
   async commit(userId, workspaceId, shopId, workbook, options = {}) {
     const normalized = this.normalizeWorkbook(workbook);
-    const preview = this.catalog.importPreview(userId, workspaceId, shopId, normalized.rows);
+    const preview = this.preview(userId, workspaceId, shopId, workbook);
     assert(preview.valid || options.skipInvalid, 'IMPORT_VALIDATION_FAILED', 'Исправьте ошибки перед импортом', 422, preview.errors);
-    const existing = this.catalog.categories(userId, workspaceId, shopId);
-    const byName = new Map(existing.map(category => [category.name.trim().toLowerCase(), category]));
-    const createdCategories = [];
-    const ensureCategory = async name => {
-      const key = String(name || '').trim().toLowerCase();
-      if (!key) return null;
-      if (byName.has(key)) return byName.get(key);
-      const category = await this.catalog.createCategory(userId, workspaceId, shopId, { name });
-      byName.set(key, category); createdCategories.push(category); return category;
-    };
-    for (const entry of normalized.categories) {
-      const parent = await ensureCategory(entry.name);
-      if (entry.childName) {
-        const key = entry.childName.trim().toLowerCase();
-        if (!byName.has(key)) {
-          const child = await this.catalog.createCategory(userId, workspaceId, shopId, { name: entry.childName, parentId: parent?.id || null });
-          byName.set(key, child); createdCategories.push(child);
-        }
-      }
-    }
+    const invalid = new Set(preview.errors.map(error => error.line - 2));
     const grouped = new Map();
     normalized.rows.forEach((row, index) => {
-      if ((!row.name || !row.sku) && options.skipInvalid) return;
+      if (invalid.has(index) && options.skipInvalid) return;
       const key = String(row.sku || `row-${index}`).trim();
-      if (!grouped.has(key)) grouped.set(key, { ...row, variants: [] });
+      if (!grouped.has(key)) grouped.set(key, { ...row, variants: [], imageSources: new Set() });
+      if (row.image) grouped.get(key).imageSources.add(row.image);
       if (row.variant) grouped.get(key).variants.push({ name: row.variant, sku: `${key}-${grouped.get(key).variants.length + 1}`, price: row.price, stock: row.stock, barcode: row.barcode || '' });
     });
-    const imported = [];
-    const errors = [];
-    for (const row of grouped.values()) {
-      try {
-        const category = await ensureCategory(row.subcategory || row.category);
-        imported.push(await this.catalog.createProduct(userId, workspaceId, shopId, {
-          name: row.name,
-          sku: row.sku,
-          price: row.price,
-          stock: row.stock,
-          categoryId: category?.id || null,
-          brand: row.brand || '',
-          description: row.description || '',
-          barcode: row.barcode || '',
-          images: row.image ? [{ url: row.image, primary: true }] : [],
-          variants: row.variants,
-          active: options.active !== false,
-        }));
-      } catch (error) { errors.push({ sku: row.sku, message: error.message, code: error.code || 'IMPORT_ERROR' }); }
+    const sources = [...new Set([...grouped.values()].flatMap(row => [...row.imageSources]))];
+    const images = new Map();
+    // Download before the catalogue transaction: unavailable photos must not silently
+    // create a partially imported catalogue with external or broken image links.
+    let cursor = 0;
+    const download = async () => {
+      while (cursor < sources.length) {
+        const source = sources[cursor++];
+        assert(this.media, 'IMPORT_MEDIA_UNAVAILABLE', 'Хранилище фотографий не настроено', 503);
+        let localFile;
+        try {
+          const url = new URL(source, 'https://local.invalid');
+          if (url.pathname.startsWith(this.media.publicPrefix) && ['http:', 'https:'].includes(url.protocol)) {
+            const filename = decodeURIComponent(url.pathname.slice(this.media.publicPrefix.length));
+            this.media.resolve(filename);
+            localFile = { filename, url: `${this.media.publicPrefix}${filename}` };
+          }
+        } catch { /* Nonlocal sources are validated and fetched by the media service. */ }
+        try { images.set(source, localFile || await this.media.importRemote(source)); }
+        catch (error) {
+          const affected = [...grouped.values()].filter(row => row.imageSources.has(source)).map(row => row.sku);
+          let address = 'Некорректный адрес';
+          try {
+            const safe = new URL(source);
+            address = `${safe.protocol}//${safe.host}${safe.pathname}`;
+          } catch { /* Do not echo credentials or query parameters from untrusted URLs. */ }
+          throw new AppError(error.code || 'MEDIA_DOWNLOAD_FAILED',
+            `Не удалось сохранить фото для SKU ${affected.slice(0, 5).join(', ')}. ${error.message}`,
+            error.status || 502, [{ sku: affected[0], message: address }]);
+        }
+      }
+    };
+    const downloads = await Promise.allSettled(Array.from({ length: Math.min(4, sources.length) }, download));
+    const failure = downloads.find(result => result.status === 'rejected');
+    if (failure) throw failure.reason;
+    const inputs = [...grouped.values()].map(({ imageSources, ...row }) => ({ ...row,
+      images: imageSources.size ? [...imageSources].map((source, index) => ({ ...images.get(source), primary: index === 0 })) : undefined,
+      active: options.active !== false,
+    }));
+    const result = await this.catalog.importBatch(userId, workspaceId, shopId, inputs, normalized.categories, options);
+    if (invalid.size && options.skipInvalid) {
+      result.failed += invalid.size;
+      result.errors.push(...[...invalid].map(index => ({ line: index + 2, sku: normalized.rows[index]?.sku,
+        code: 'IMPORT_VALIDATION_FAILED', message: preview.errors.filter(error => error.line === index + 2).map(error => error.message).join('; ') })));
     }
-    return { imported: imported.length, failed: errors.length, createdCategories: createdCategories.length, products: imported, errors };
+    return result;
   }
 }
