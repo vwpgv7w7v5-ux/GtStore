@@ -9,7 +9,7 @@ const botToken='123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ_12345';
 const fakeFetch=async url=>({ok:true,json:async()=>({ok:true,result:url.endsWith('/getMe')?{id:777,username:'bot'}:true})});
 const signInitData=user=>{const p=new URLSearchParams({auth_date:String(Math.floor(Date.now()/1000)),query_id:'q',user:JSON.stringify(user)});const check=[...p.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${k}=${v}`).join('\n');const secret=crypto.createHmac('sha256','WebAppData').update(botToken).digest();p.set('hash',crypto.createHmac('sha256',secret).update(check).digest('hex'));return p.toString()};
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'gtstore-v620-'));
-const {server}=createApp({databaseFile:path.join(temp,'db.json'),mediaDirectory:path.join(temp,'media'),fetch:fakeFetch,telegramSecret:'secret'});
+const {server}=createApp({telegramAvatarDownloader:async()=>{throw new Error("No avatar in this identity fixture")},databaseFile:path.join(temp,'db.json'),mediaDirectory:path.join(temp,'media'),fetch:fakeFetch,telegramSecret:'secret'});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const base=`http://127.0.0.1:${server.address().port}/api/v6`;
 const req=async(url,opt={})=>{const r=await fetch(base+url,{...opt,headers:{'content-type':'application/json',...(opt.headers||{})},body:opt.body?JSON.stringify(opt.body):undefined});const j=await r.json();if(!r.ok)throw Object.assign(new Error(j.error?.message),{status:r.status});return j};

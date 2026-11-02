@@ -1,14 +1,25 @@
 import { assert } from '../core/errors.js';
 import { id, token } from '../core/ids.js';
 import { hashPassword } from '../core/password.js';
+import { Permission, permissionsForRole, hasPermission } from './permissions.js';
 
 const roles = new Set(['viewer','manager','admin']);
 export class TeamService {
-  constructor(store, tenancy, auth){ this.store=store; this.tenancy=tenancy; this.auth=auth; }
+  constructor(store, tenancy, auth, mail = null, options = {}){
+    this.store=store; this.tenancy=tenancy; this.auth=auth; this.mail=mail;
+    this.acceptBaseUrl=String(options.acceptBaseUrl||process.env.ADMIN_URL||process.env.PUBLIC_BASE_URL||'http://127.0.0.1:4173').replace(/\/$/,'');
+  }
+  permissionCatalog(){ return { permissions: Object.values(Permission), roles: { viewer: permissionsForRole('viewer'), manager: permissionsForRole('manager'), admin: permissionsForRole('admin'), owner: permissionsForRole('owner') } }; }
+  can(userId, workspaceId, permission){
+    const c=this.tenancy.context(userId,workspaceId,'viewer');
+    const membership=c.state.memberships.find(m=>m.userId===userId&&m.workspaceId===workspaceId);
+    return hasPermission(membership?.role||'viewer', permission);
+  }
   list(userId, workspaceId){
     const c=this.tenancy.context(userId,workspaceId,'admin');
     return c.state.memberships.filter(m=>m.workspaceId===workspaceId).map(m=>({
       ...m,
+      permissions: permissionsForRole(m.role),
       user:this.auth.publicUser(c.state.users.find(u=>u.id===m.userId)),
       shops:(m.shopIds||[]).map(shopId=>c.state.shops.find(s=>s.id===shopId)).filter(Boolean)
     }));
@@ -19,7 +30,18 @@ export class TeamService {
     assert(email.includes('@'),'EMAIL_REQUIRED','Укажите корректный email'); assert(roles.has(input.role),'ROLE_INVALID','Недопустимая роль');
     const shopIds=Array.isArray(input.shopIds)?input.shopIds:[]; shopIds.forEach(shopId=>assert(c.state.shops.some(s=>s.id===shopId&&s.workspaceId===workspaceId),'SHOP_NOT_FOUND','Магазин не найден',404));
     const raw=token();
-    return this.store.transaction(userId,db=>{ db.invitations ||= []; const invite={id:id('inv'),workspaceId,email,role:input.role,shopIds,token:raw,status:'pending',expiresAt:new Date(Date.now()+7*86400000).toISOString(),createdAt:new Date().toISOString(),createdBy:userId}; db.invitations.push(invite); return invite; });
+    const invite=await this.store.transaction(userId,db=>{ db.invitations ||= []; const row={id:id('inv'),workspaceId,email,role:input.role,shopIds,token:raw,status:'pending',expiresAt:new Date(Date.now()+7*86400000).toISOString(),createdAt:new Date().toISOString(),createdBy:userId}; db.invitations.push(row); return row; });
+    const acceptUrl=`${this.acceptBaseUrl}/?invite=${encodeURIComponent(invite.token)}`;
+    let mail=null;
+    if(this.mail){
+      mail=await this.mail.send({
+        to:email,
+        subject:'Приглашение в GStore',
+        text:`Вас пригласили в рабочее пространство GStore.\nРоль: ${invite.role}\nПринять приглашение: ${acceptUrl}\nТокен: ${invite.token}`,
+        html:`<p>Вас пригласили в рабочее пространство GStore.</p><p>Роль: <b>${invite.role}</b></p><p><a href="${acceptUrl}">Принять приглашение</a></p><p>Токен: <code>${invite.token}</code></p>`,
+      });
+    }
+    return {...invite, acceptUrl, mailStatus:mail?.status||'skipped'};
   }
   async accept(input){
     const raw=String(input.token||''); const state=this.store.snapshot(); const invite=(state.invitations||[]).find(i=>i.token===raw&&i.status==='pending');

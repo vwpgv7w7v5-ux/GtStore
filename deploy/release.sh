@@ -6,7 +6,7 @@ umask 077
 [[ $# -eq 2 && $2 =~ ^[0-9a-f]{40}$ ]] || { echo 'Usage: release.sh <source.tar.gz> <full-commit-sha>' >&2; exit 2; }
 archive=$1
 commit=$2
-root=${GTSTORE_ROOT:-/opt/gtstore}
+root=${GTSTORE_ROOT:-/srv/gtstore}
 state=${GTSTORE_STATE:-/var/lib/gtstore}
 environment_file=${GTSTORE_ENV_FILE:-/etc/gtstore/gtstore.env}
 health_url=${GTSTORE_HEALTH_URL:-http://127.0.0.1:4000/api/v6/health}
@@ -126,6 +126,7 @@ if [[ $test_mode == 1 ]]; then
   "$GTSTORE_TEST_INSTALL" "$staging"
 else
   (cd "$staging" && npm ci --omit=dev --ignore-scripts --cache "$root/npm-cache" --no-audit --no-fund)
+  (cd "$staging" && node -e 'require("sharp")({create:{width:2,height:2,channels:3,background:"#ffffff"}}).webp().toBuffer().catch(()=>process.exit(1))')
 fi
 node --check "$staging/apps/api-v6/src/server.js"
 printf '%s\n' "$commit" > "$staging/.gtstore-release"

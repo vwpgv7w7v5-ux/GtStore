@@ -1,0 +1,8 @@
+- data/*.json
+- data/backups/
+- data/import-jobs/
+- uploads/
+- .env
+- .env.*
+- .git/
+- node_modules/

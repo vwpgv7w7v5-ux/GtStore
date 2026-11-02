@@ -9,7 +9,7 @@ location = /admin {
 }
 
 location /admin/ {
-    alias /opt/gtstore/current/apps/admin-v6/;
+    alias /srv/gtstore/current/apps/admin-v6/;
     index index.html;
     add_header Cache-Control "no-cache";
 }
@@ -24,7 +24,7 @@ location /api/v6/ {
 }
 
 location / {
-    root /opt/gtstore/current/apps/storefront-v6;
+    root /srv/gtstore/current/apps/storefront-v6;
     index index.html;
     try_files $uri $uri/ =404;
     add_header Cache-Control "no-cache";

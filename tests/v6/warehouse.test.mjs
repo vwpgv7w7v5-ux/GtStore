@@ -22,7 +22,10 @@ try{
   const stocktake=await req(root+'/warehouse/stocktakes',{method:'POST',headers:auth,body:{note:'Плановая проверка',items:[{productId:product.id,variantId:black.id,actual:6},{productId:product.id,variantId:white.id,actual:9}]}}); assert.equal(stocktake.status,'completed'); assert.equal(stocktake.differences,2);
   await req(root+'/storefront/publish',{method:'POST',headers:auth});
   const order=await req(`/public/storefronts/${shop.slug}/orders`,{method:'POST',body:{customer:{name:'Кирилл',phone:'+79990000000'},items:[{productId:product.id,variantId:black.id,quantity:2}]}}); assert.equal(order.lines[0].quantity,2);
-  let inventory=await req(root+'/warehouse/inventory?q=WH-BLK',{headers:auth}); assert.equal(inventory[0].stock,4);
+  let inventory=await req(root+'/warehouse/inventory?q=WH-BLK',{headers:auth}); assert.equal(inventory[0].stock,6); assert.equal(inventory[0].available,4); assert.equal(inventory[0].reserved,2);
+  const reservations=await req(root+'/warehouse/reservations',{headers:auth}); assert.equal(reservations.filter(r=>r.status==='active').length,1);
+  await req(root+`/orders/${order.id}`,{method:'PATCH',headers:auth,body:{status:'confirmed'}});
+  inventory=await req(root+'/warehouse/inventory?q=WH-BLK',{headers:auth}); assert.equal(inventory[0].stock,4); assert.equal(inventory[0].available,4);
   let movements=await req(root+'/warehouse/movements',{headers:auth}); assert.ok(movements.some(x=>x.type==='sale'&&x.reference===order.id)); assert.ok(movements.some(x=>x.type==='stocktake'));
   const cancelled=await req(root+`/orders/${order.id}`,{method:'PATCH',headers:auth,body:{status:'cancelled'}}); assert.equal(cancelled.status,'cancelled');
   inventory=await req(root+'/warehouse/inventory?q=WH-BLK',{headers:auth}); assert.equal(inventory[0].stock,6);

@@ -57,4 +57,27 @@ export class WarehouseService {
       db.stocktakes.push(stocktake);return stocktake;});
   }
   metrics(userId,workspaceId,shopId){const rows=this.inventory(userId,workspaceId,shopId);return{skuCount:rows.length,totalStock:rows.reduce((s,x)=>s+x.stock,0),reserved:rows.reduce((s,x)=>s+x.reserved,0),available:rows.reduce((s,x)=>s+x.available,0),lowStock:rows.filter(x=>x.available<=3).length,outOfStock:rows.filter(x=>x.available===0).length};}
+  reservations(userId,workspaceId,shopId){
+    this.ensureShop(userId,workspaceId,shopId);
+    const state=this.store.snapshot();
+    return (state.stockReservations||[])
+      .filter(x=>x.shopId===shopId)
+      .sort((a,b)=>b.createdAt.localeCompare(a.createdAt))
+      .map(r=>{
+        const product=(state.products||[]).find(p=>p.id===r.productId);
+        return {...r,sku:product?.variants?.find(v=>v.id===r.variantId)?.sku||product?.sku||'',name:product?.name||''};
+      });
+  }
+  async releaseReservation(userId,workspaceId,shopId,reservationId){
+    this.ensureShop(userId,workspaceId,shopId,'manager');
+    return this.store.transaction(userId,db=>{
+      const row=(db.stockReservations||[]).find(x=>x.id===reservationId&&x.shopId===shopId);
+      assert(row,'RESERVATION_NOT_FOUND','Резерв не найден',404);
+      assert(row.status==='active','RESERVATION_NOT_ACTIVE','Резерв уже закрыт');
+      row.status='released';
+      row.updatedAt=now();
+      row.releasedBy=userId;
+      return row;
+    });
+  }
 }

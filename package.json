@@ -16,15 +16,17 @@
     "check": "node --check server.js && node --check public/admin.js && node --check public/store.js",
     "v6:api": "node apps/api-v6/src/server.js",
     "v6:admin": "node scripts/serve-static.js apps/admin-v6 4173",
-    "v6:test": "node tests/v6/foundation.test.mjs && node tests/v6/catalog-engine.test.mjs && node tests/v6/import-media.test.mjs && node tests/v6/storefront-builder.test.mjs && node tests/v6/checkout-orders.test.mjs && node tests/v6/telegram-orders.test.mjs && node tests/v6/telegram-customer.test.mjs && node tests/v6/customer-crm.test.mjs && node tests/v6/promotions-loyalty-checkout.test.mjs && node tests/v6/campaigns-automation.test.mjs && node tests/v6/campaign-studio-ui.test.mjs && node tests/v6/automation-flows.test.mjs && node tests/v6/automation-studio-ui.test.mjs && node tests/v6/analytics.test.mjs && node tests/v6/team-multistore.test.mjs && node tests/v6/webhooks-integrations.test.mjs && node tests/v6/payments.test.mjs && node tests/v6/warehouse.test.mjs && node tests/v6/warehouse-ui.test.mjs && node tests/v6/delivery.test.mjs && node tests/v6/delivery-ui.test.mjs && node tests/v6/theme-builder.test.mjs && node tests/v6/theme-builder-ui.test.mjs && node tests/v6/customer-accounts.test.mjs && node tests/v6/remote-media.test.mjs && node tests/v6/import-persistence.test.mjs",
+    "v6:test": "node tests/v6/foundation.test.mjs && node tests/v6/auth-onboarding.test.mjs && node tests/v6/catalog-engine.test.mjs && node tests/v6/import-media.test.mjs && node tests/v6/media-ingest.test.mjs && node tests/v6/storefront-builder.test.mjs && node tests/v6/checkout-orders.test.mjs && node tests/v6/checkout-delivery-payments.test.mjs && node tests/v6/telegram-orders.test.mjs && node tests/v6/telegram-auto-webhook.test.mjs && node tests/v6/telegram-polling.test.mjs && node tests/v6/telegram-customer.test.mjs && node tests/v6/customer-crm.test.mjs && node tests/v6/promotions-loyalty-checkout.test.mjs && node tests/v6/campaigns-automation.test.mjs && node tests/v6/campaign-studio-ui.test.mjs && node tests/v6/automation-flows.test.mjs && node tests/v6/automation-studio-ui.test.mjs && node tests/v6/analytics.test.mjs && node tests/v6/team-multistore.test.mjs && node tests/v6/webhooks-integrations.test.mjs && node tests/v6/payments.test.mjs && node tests/v6/warehouse.test.mjs && node tests/v6/warehouse-ui.test.mjs && node tests/v6/delivery.test.mjs && node tests/v6/delivery-ui.test.mjs && node tests/v6/theme-builder.test.mjs && node tests/v6/theme-builder-ui.test.mjs && node tests/v6/customer-accounts.test.mjs && node tests/v6/import-upsert-settings.test.mjs && node tests/v6/api-keys-auth.test.mjs && node tests/v6/apiship-client.test.mjs && node tests/v6/permissions-acl.test.mjs && node tests/v6/help-support.test.mjs && node tests/v6/ecosystem-parity.test.mjs && node tests/v6/remote-media.test.mjs && node tests/v6/import-persistence.test.mjs && node tests/v6/import-jobs.test.mjs",
+    "v6:auth:test": "node tests/v6/auth-onboarding.test.mjs",
+    "v6:settings:test": "node tests/v6/import-upsert-settings.test.mjs",
     "v6:dev": "node apps/api-v6/src/server.js",
     "v6:stats": "node scripts/code-stats-v6.js",
     "v6:catalog:test": "node tests/v6/catalog-engine.test.mjs",
     "v6:import:test": "node tests/v6/import-media.test.mjs",
     "v6:storefront": "node scripts/serve-static.js apps/storefront-v6 4174",
     "v6:storefront:test": "node tests/v6/storefront-builder.test.mjs",
-    "v6:orders:test": "node tests/v6/checkout-orders.test.mjs",
-    "v6:telegram:test": "node tests/v6/telegram-orders.test.mjs",
+    "v6:orders:test": "node tests/v6/checkout-orders.test.mjs && node tests/v6/checkout-delivery-payments.test.mjs",
+    "v6:telegram:test": "node tests/v6/telegram-orders.test.mjs && node tests/v6/telegram-auto-webhook.test.mjs && node tests/v6/telegram-polling.test.mjs",
     "v6:customer:test": "node tests/v6/telegram-customer.test.mjs",
     "v6:crm:test": "node tests/v6/customer-crm.test.mjs",
     "v6:promotions:test": "node tests/v6/promotions-loyalty-checkout.test.mjs",
@@ -48,6 +50,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "sharp": "^0.33.5",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

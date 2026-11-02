@@ -69,4 +69,22 @@ export class AnalyticsService {
     const automationMetrics={rules:(state.automationRules||[]).filter(r=>r.shopId===shopId).length,total:automationRuns.length,sent:automationRuns.filter(r=>r.status==='sent').length,failed:automationRuns.filter(r=>r.status==='failed').length,pending:automationRuns.filter(r=>r.status==='pending').length};
     return {range:{days:range.days,from:range.from.toISOString(),to:range.to.toISOString()},metrics:{revenue,orders:validOrders.length,paidOrders:paidOrders.length,averageOrder,conversion,visits,productViews,carts,checkoutStarted,newCustomers:[...customerKeys.values()].filter(n=>n===1).length,repeatCustomers:[...customerKeys.values()].filter(n=>n>1).length},funnel:[{key:'visits',label:'Визиты',value:visits},{key:'views',label:'Просмотры товаров',value:productViews},{key:'carts',label:'Добавления в корзину',value:carts},{key:'checkout',label:'Начали оформление',value:checkoutStarted},{key:'orders',label:'Заказы',value:validOrders.length}],series,topProducts,sources,campaigns:campaignMetrics,automations:automationMetrics};
   }
+  utmReport(userId,workspaceId,shopId,days=30){
+    const {state}=this.ensureShop(userId,workspaceId,shopId);
+    const range=rangeFor(days);
+    const orders=(state.orders||[]).filter(o=>o.shopId===shopId&&inRange(o.createdAt,range.from,range.to)&&!['cancelled','refunded'].includes(o.status));
+    const map=new Map();
+    for(const order of orders){
+      const utm=order.utm||{};
+      const source=String(utm.source||'').trim()||'(none)';
+      const medium=String(utm.medium||'').trim()||'(none)';
+      const campaign=String(utm.campaign||'').trim()||'(none)';
+      const key=`${source}\u0000${medium}\u0000${campaign}`;
+      const row=map.get(key)||{source,medium,campaign,orders:0,revenue:0};
+      row.orders+=1;
+      row.revenue=money(row.revenue+Number(order.total||0));
+      map.set(key,row);
+    }
+    return {range:{days:range.days,from:range.from.toISOString(),to:range.to.toISOString()},rows:[...map.values()].sort((a,b)=>b.revenue-a.revenue)};
+  }
 }

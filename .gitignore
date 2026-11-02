@@ -6,6 +6,10 @@ node_modules/
 *.env
 /data/v6.json
 /data/v6.json.tmp
+/data/*.json
+/data/*.tmp
+/data/import-jobs/
+/data/backups/
 /uploads/
 /public/uploads/
 *.log

@@ -3,7 +3,7 @@
 # nginx, enable/start the API, or create/replace a production environment file.
 set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo 'Run setup.sh as root on the VPS.' >&2; exit 1; }
-root=/opt/gtstore
+root=/srv/gtstore
 state=/var/lib/gtstore
 config=/etc/gtstore
 source_directory=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -46,5 +46,5 @@ if [[ ! -e "$config/gtstore.env.example" ]]; then
   install -m 0600 "$source_directory/gtstore.env.example" "$config/gtstore.env.example"
 fi
 systemctl daemon-reload
-echo 'Prepared /opt/gtstore, /var/lib/gtstore and gtstore.service; the live site was not restarted.'
+echo 'Prepared /srv/gtstore, /var/lib/gtstore and gtstore.service; the live site was not restarted.'
 echo 'Migrate the existing database/media and create /etc/gtstore/gtstore.env with the existing secrets before the first deployment.'

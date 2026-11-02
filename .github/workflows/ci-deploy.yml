@@ -38,11 +38,15 @@ jobs:
         run: npm run v6:test
       - name: Test release and rollback scripts
         run: bash deploy/tests/release.test.sh
+      - name: Report pending production setup
+        if: github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED != 'true'
+        run: |
+          printf '%s\n' 'Production deployment is disabled until the existing VPS is migrated and SSH secrets are configured. Set repository variable DEPLOY_ENABLED=true after setup; see docs/GITHUB_DEPLOY.md.' >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     name: Deploy the tested main revision
     needs: test
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: vars.DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     concurrency:

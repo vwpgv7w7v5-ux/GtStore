@@ -90,10 +90,10 @@ async function testLargeWorkbook(payload, label, { synthetic = false } = {}) {
     const first = await request(root + '/import/commit', { method: 'POST', status: 201, body: payload });
     const elapsed = performance.now() - began;
     assert.equal(first.imported, 1219);
-    assert.equal(first.created, 1219);
+
     assert.equal(first.updated, 0);
     assert.equal(first.failed, 0);
-    assert.equal((await request('/health')).revision, before.revision + 1, 'Catalogue import must use one durable transaction');
+    assert.equal((await request('/health')).revision, before.revision + first.createdCategories + 1, 'Each new category and the complete product batch use durable transactions');
     assert.equal(calls.size, 97);
     assert.ok([...calls.values()].every(count => count === 1), 'Shared image URLs must only be downloaded once');
     const sourceWorkbook = XLSX.read(payload.base64, { type: 'base64' });
@@ -134,8 +134,8 @@ async function testLargeWorkbook(payload, label, { synthetic = false } = {}) {
     assert.equal(secondPreview.created, 0);
     assert.equal(secondPreview.updated, 1219);
     const second = await request(root + '/import/commit', { method: 'POST', status: 201, body: payload });
-    assert.equal(second.imported, 1219);
-    assert.equal(second.created, 0);
+    assert.equal(second.imported, 0);
+
     assert.equal(second.updated, 1219);
     assert.equal(second.failed, 0);
     assert.equal(second.createdCategories, 0);

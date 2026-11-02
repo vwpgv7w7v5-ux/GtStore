@@ -65,6 +65,7 @@ function responseFrom(request, timeoutMs) {
 }
 
 async function requestImage(url, { addresses, timeoutMs, proxy }) {
+  const deadline = Date.now() + timeoutMs;
   if (!proxy) {
     let index = 0;
     const lookup = (_hostname, options, callback) => {
@@ -108,7 +109,7 @@ async function requestImage(url, { addresses, timeoutMs, proxy }) {
   secure.once('error', () => {}); // The HTTP request also receives TLS errors.
   const request = https.request(url, { agent, headers: { accept: 'image/jpeg,image/png,image/webp,image/gif' } });
   try {
-    const response = await responseFrom(request, timeoutMs);
+    const response = await responseFrom(request, Math.max(1, deadline - Date.now()));
     response.once('close', () => { agent.destroy(); socket.destroy(); });
     return response;
   } catch (error) { agent.destroy(); socket.destroy(); throw error; }

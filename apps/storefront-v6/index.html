@@ -1,1 +1,142 @@
-<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GtStore Mini App</title><link rel="stylesheet" href="./storefront.css"></head><body><div id="app"><div class="loading">Загрузка витрины…</div></div><script type="module" src="./storefront.js"></script></body></html>
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <title>GStore</title>
+  <link rel="icon" href="/gstore-mark.png?v=3" type="image/png" sizes="64x64">
+  <link rel="icon" href="/gstore-mark.svg?v=3" type="image/svg+xml">
+  <link rel="shortcut icon" href="/favicon.ico?v=3">
+  <link rel="apple-touch-icon" href="/gstore-touch.png?v=3">
+  <style id="sf-viewport-lock">
+    /* Permanent viewport lock — inline so it cannot be skipped by CSS cache/order.
+       Do not remove: Telegram iOS expands layout width if any child overflows. */
+    html,body{margin:0;min-height:100%;background:#ebe5db;color:#2a2724;font-family:"Plus Jakarta Sans",ui-sans-serif,system-ui,sans-serif;-webkit-text-size-adjust:100%}
+    html.tg-miniapp,body.tg-miniapp,html.tg-miniapp body{
+      width:100%!important;max-width:100%!important;overflow-x:hidden!important;
+      overscroll-behavior-x:none;
+    }
+    html.tg-miniapp #app,body.tg-miniapp #app{
+      width:100%!important;
+      max-width:min(100%,var(--app-w,100%))!important;
+      overflow-x:hidden!important;
+      box-sizing:border-box!important;
+    }
+    html.tg-miniapp .grid,body.tg-miniapp .grid{
+      display:grid!important;
+      grid-template-columns:repeat(2,minmax(0,1fr))!important;
+      gap:8px!important;width:100%!important;max-width:100%!important;min-width:0!important;
+    }
+    html.tg-miniapp .grid.mode-list,body.tg-miniapp .grid.mode-list{grid-template-columns:1fr!important}
+    html.tg-miniapp .product,body.tg-miniapp .product{min-width:0!important;max-width:100%!important;overflow:hidden}
+    html.tg-miniapp .product img,html.tg-miniapp .product .image,
+    body.tg-miniapp .product img,body.tg-miniapp .product .image{max-width:100%!important;width:100%!important;height:auto}
+    html.tg-miniapp img,html.tg-miniapp video,html.tg-miniapp canvas,html.tg-miniapp svg,
+    body.tg-miniapp img,body.tg-miniapp video,body.tg-miniapp canvas,body.tg-miniapp svg{max-width:100%}
+    html.tg-miniapp .vitrina-tiles,body.tg-miniapp .vitrina-tiles{width:100%!important;max-width:100%!important;overflow:hidden!important}
+    html.tg-miniapp .vitrina-tile.image-only,body.tg-miniapp .vitrina-tile.image-only{
+      float:left!important;width:50%!important;max-width:50%!important;margin:0!important;
+      padding:0 5px 10px!important;box-sizing:border-box!important;min-width:0!important;
+    }
+    @media (max-width:640px){
+      html,body{overflow-x:hidden!important;max-width:100%!important}
+      #app{width:100%!important;max-width:100%!important;overflow-x:hidden!important;box-sizing:border-box!important}
+      .grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;width:100%!important;min-width:0!important}
+      .product{min-width:0!important;max-width:100%!important;overflow:hidden}
+      .product img,.product .image{max-width:100%!important;width:100%!important}
+    }
+    #app .loading{display:grid;justify-items:center;align-content:center;gap:14px;min-height:70vh;opacity:.92;font-weight:650}
+    #app .loading:before{content:"";width:56px;height:56px;border-radius:14px;background:#c45a32 url("/gstore-mark.png?v=3") center/72% no-repeat;box-shadow:0 10px 28px rgba(0,0,0,.18)}
+    #app .error{max-width:28rem;margin:20vh auto;padding:1.5rem;text-align:center;background:#f7f3ec;border-radius:20px}
+    #app .error a{color:#c45a32}
+  </style>
+  <script>
+    (function () {
+      var root = document.documentElement;
+      function vw() {
+        var vv = window.visualViewport;
+        var w = Math.floor((vv && vv.width) || window.innerWidth || screen.width || 390);
+        return Math.max(280, Math.min(w, 1200));
+      }
+      function lockWidth() {
+        root.style.setProperty('--app-w', vw() + 'px');
+        try {
+          root.scrollLeft = 0;
+          if (document.body) document.body.scrollLeft = 0;
+        } catch (e) {}
+      }
+      function markMiniapp(forceNative) {
+        var tg = window.Telegram && window.Telegram.WebApp;
+        var hash = location.hash || '';
+        var isTg = !!(forceNative || (tg && (tg.initData || (tg.initDataUnsafe && (tg.initDataUnsafe.user || tg.initDataUnsafe.query_id)) || (tg.platform && tg.platform !== 'unknown'))) || /tgWebAppData=/.test(hash));
+        var narrow = Math.min(screen.width || 0, window.innerWidth || 0) <= 640;
+        if (isTg || narrow || root.classList.contains('tg-miniapp')) {
+          root.classList.add('tg-miniapp');
+          if (isTg) root.classList.add('tg-native');
+          if (document.body) {
+            document.body.classList.add('tg-miniapp');
+            if (isTg) document.body.classList.add('tg-native');
+          }
+        }
+        lockWidth();
+      }
+      markMiniapp(false);
+      document.addEventListener('DOMContentLoaded', function () { markMiniapp(false); });
+      window.addEventListener('resize', lockWidth, { passive: true });
+      window.addEventListener('orientationchange', function () { setTimeout(function () { markMiniapp(false); }, 50); });
+      if (window.visualViewport) {
+        visualViewport.addEventListener('resize', lockWidth, { passive: true });
+      }
+      try {
+        var tg0 = window.Telegram && window.Telegram.WebApp;
+        if (tg0) { tg0.ready(); tg0.expand(); }
+      } catch (e) {}
+      var s = document.createElement('script');
+      s.src = 'https://telegram.org/js/telegram-web-app.js';
+      s.async = true;
+      s.onload = function () {
+        try {
+          var w = window.Telegram && window.Telegram.WebApp;
+          if (w) { w.ready(); w.expand(); markMiniapp(true); }
+        } catch (e) {}
+        try { window.dispatchEvent(new Event('telegram-web-app-ready')); } catch (e) {}
+      };
+      document.head.appendChild(s);
+      window.__sfLockViewport = markMiniapp;
+      window.__sfLockWidth = lockWidth;
+    })();
+  </script>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <link rel="stylesheet" href="/storefront.css?v=6509">
+  <!-- Fonts must not block Telegram WebView (fonts.googleapis.com often hangs in RU). -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"></noscript>
+</head>
+<body>
+  <div class="sf-aurora" aria-hidden="true">
+    <span class="sf-island sf-island-a"></span>
+    <span class="sf-island sf-island-b"></span>
+    <span class="sf-island sf-island-c"></span>
+  </div>
+  <div id="app"><div class="loading">Загрузка витрины…</div></div>
+  <div id="modal"></div>
+  <script>
+    (function () {
+      var app = document.getElementById('app');
+      setTimeout(function () {
+        if (!app) return;
+        var t = (app.textContent || '').trim();
+        if (t.indexOf('Загрузка витрины') === -1) return;
+        app.innerHTML = '<div class="error"><h1>Долгая загрузка</h1><p>Обновите мини-приложение.</p><p style="margin-top:1rem"><button id="retry-sf" style="padding:.7rem 1rem;border:0;border-radius:12px;background:#171717;color:#fff">Обновить</button></p></div>';
+        var b = document.getElementById('retry-sf');
+        if (b) b.onclick = function () {
+          var u = new URL(location.href);
+          u.searchParams.set('_', String(Date.now()));
+          location.replace(u.pathname + u.search + u.hash);
+        };
+      }, 7000);
+    })();
+  </script>
+  <script src="/storefront.js?v=6509" defer></script>
+</body>
+</html>
