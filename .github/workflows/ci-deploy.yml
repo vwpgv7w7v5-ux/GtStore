@@ -37,7 +37,9 @@ jobs:
       - name: Test v6, imports and persistent photos
         run: npm run v6:test
       - name: Test release and rollback scripts
-        run: bash deploy/tests/release.test.sh
+        run: |
+          bash deploy/tests/release.test.sh
+          python3 deploy/tests/update-existing.test.py
       - name: Report pending production setup
         if: github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED != 'true'
         run: |
